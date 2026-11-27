@@ -26,6 +26,7 @@ data class AppCommand(
         const val WIFI_SETTINGS = "WIFI_SETTINGS"
         const val BLUETOOTH_SETTINGS = "BLUETOOTH_SETTINGS"
         const val NAVIGATE_MAPS = "NAVIGATE_MAPS"
+        const val GET_CURRENT_LOCATION = "GET_CURRENT_LOCATION"
         const val SAVE_PARKING = "SAVE_PARKING"
         const val FIND_PARKING = "FIND_PARKING"
         const val SCAN_BARCODE = "SCAN_BARCODE"
