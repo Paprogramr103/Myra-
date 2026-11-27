@@ -70,7 +70,7 @@ object ToolRegistry {
         ),
         ToolDefinition(
             name = "send_whatsapp_message",
-            description = "After the user explicitly confirms the exact message, open the WhatsApp chat with the message prefilled. The native executor may tap Send only if Accessibility verifies the foreground WhatsApp package and the composer text exactly matches the confirmed message.",
+            description = "Stage the exact requested WhatsApp message for MYRA's native one-time confirmation flow. Do not ask the user for confirmation yourself and do not invoke this tool repeatedly for the same message. MYRA will read the message aloud and ask once; only after a clear explicit yes will the native executor open the WhatsApp chat and may tap Send if Accessibility verifies the foreground WhatsApp package and exact composer text.",
             commandType = AppCommand.WHATSAPP_MSG,
             parameters = mapOf(
                 "target" to ("STRING" to "Contact name or phone number"),
