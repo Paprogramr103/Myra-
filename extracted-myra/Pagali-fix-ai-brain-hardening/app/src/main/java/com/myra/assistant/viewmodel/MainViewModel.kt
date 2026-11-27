@@ -21,6 +21,7 @@ import com.myra.assistant.ai.CommandParser
 import com.myra.assistant.ai.ChatHistoryToolRegistry
 import com.myra.assistant.ai.GeminiLiveClient
 import com.myra.assistant.ai.ToolRegistry
+import com.myra.assistant.ai.WhatsAppConfirmationPolicy
 import com.myra.assistant.ai.MemoryToolRegistry
 import com.myra.assistant.ai.EmotionalMemoryToolRegistry
 import com.myra.assistant.data.db.DiagnosticLogEntity
@@ -795,9 +796,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         // Do not mistake the original request transcript for a reply to a prompt
         // that has not actually been queued to Gemini Live yet.
         if (lastPromptedWhatsAppMessage != pending) return false
-        val spoken = spokenText.lowercase().trim().replace(Regex("""[,.!?।]"""), " ").replace(Regex("""\s+"""), " ")
-        val negative = listOf("nahi", "नहीं", "ना भेजो", "मत भेजो", "mat bhejo", "cancel", "रद्द", "रोक दो", "stop", "बदल दो", "badal do", "change it").any { spoken.contains(it) }
-        if (negative) {
+        if (WhatsAppConfirmationPolicy.isNegative(spokenText)) {
             pendingWhatsAppMessage = null
             lastPromptedWhatsAppMessage = null
             val reply = "ठीक है, WhatsApp मैसेज रद्द कर दिया। कुछ भी नहीं भेजा गया।"
@@ -805,8 +804,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             geminiLive?.sendText("Tell the user in Hindi: $reply")
             return true
         }
-        val affirmative = listOf("haan", "हाँ", "जी हाँ", "yes", "okay", "ok", "ठीक है", "theek hai", "बिल्कुल", "bilkul", "send kar do", "bhej do", "भेज दो", "सेंड कर दो").any { spoken == it || spoken.startsWith("$it ") || spoken.contains(" $it ") }
-        if (!affirmative) {
+        if (!WhatsAppConfirmationPolicy.isAffirmative(spokenText)) {
             geminiLive?.sendText("Ask in Hindi: 'क्या मैं यही मैसेज भेजने के लिए WhatsApp खोल दूँ? हाँ या नहीं बोलिए।' Do not execute any action.")
             return true
         }
