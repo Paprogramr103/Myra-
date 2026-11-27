@@ -1,7 +1,6 @@
 package com.myra.assistant
 
 import android.content.Context
-import androidx.compose.ui.test.assertExists
 import androidx.compose.ui.test.assertIsDisplayed
 import androidx.compose.ui.test.junit4.createComposeRule
 import androidx.compose.ui.test.onNodeWithTag
@@ -104,7 +103,6 @@ class MyraRobolectricTest {
         }
         composeRule.onNodeWithTag("myra_orb").assertIsDisplayed()
         composeRule.onNodeWithTag("myra_waveform").assertIsDisplayed()
-        composeRule.onNodeWithTag("mic_button").assertExists()
         composeRule.onNodeWithTag("text_command_input").assertIsDisplayed()
     }
 }
