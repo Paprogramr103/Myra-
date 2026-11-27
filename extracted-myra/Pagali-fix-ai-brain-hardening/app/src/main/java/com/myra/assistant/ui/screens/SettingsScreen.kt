@@ -6,6 +6,8 @@ import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,6 +23,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -54,6 +57,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,6 +67,7 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.launch
 import com.myra.assistant.data.db.UserMemoryEntity
 import com.myra.assistant.data.db.EmotionalMemoryEntity
 import com.myra.assistant.data.db.PendingMemoryEntity
@@ -157,6 +162,8 @@ fun SettingsScreen(
     var editingEmotion by remember { mutableStateOf("") }
     var editingEmotionalContext by remember { mutableStateOf("") }
     var backupPassphrase by remember { mutableStateOf("") }
+    val settingsListState = rememberLazyListState()
+    val settingsNavigationScope = rememberCoroutineScope()
 
     Column(
         modifier = Modifier
@@ -181,7 +188,38 @@ fun SettingsScreen(
             Text("MYRA SETTINGS", style = MaterialTheme.typography.titleLarge, color = MyraRed)
         }
 
+        // Quick navigation keeps the existing settings form and callbacks mounted.
+        // Tapping a category scrolls to its real controls instead of opening placeholder pages.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(horizontal = 12.dp, vertical = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+        ) {
+            listOf(
+                "Voice" to 0,
+                "Profile" to 4,
+                "Connect" to 6,
+                "AI Brain" to 8,
+                "Activity" to 10,
+                "Permissions" to 13,
+            ).forEach { (label, targetIndex) ->
+                TextButton(
+                    onClick = {
+                        settingsNavigationScope.launch {
+                            settingsListState.animateScrollToItem(targetIndex)
+                        }
+                    },
+                    modifier = Modifier.testTag("settings_nav_${label.lowercase().replace(' ', '_')}"),
+                ) {
+                    Text(label, color = MyraCyan, style = MaterialTheme.typography.labelMedium)
+                }
+            }
+        }
+
         LazyColumn(
+            state = settingsListState,
             modifier = Modifier
                 .weight(1f)
                 .padding(horizontal = 16.dp),
