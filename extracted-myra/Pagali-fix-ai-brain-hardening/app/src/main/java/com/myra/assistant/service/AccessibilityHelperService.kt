@@ -262,9 +262,14 @@ class AccessibilityHelperService : AccessibilityService() {
         fun findSendButton(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
             val label = listOf(node.text?.toString(), node.contentDescription?.toString())
                 .filterNotNull().joinToString(" ").trim().lowercase()
-            val isSend = label == "send" || label.contains("send message") ||
+            val resourceId = node.viewIdResourceName.orEmpty().substringAfterLast("/")
+            val isSendLabel = label == "send" || label.contains("send message") ||
                 label == "भेजें" || label == "भेजो" || label.contains("संदेश भेजें")
-            if (isSend && node.isClickable && !node.isEditable && node.isEnabled) return node
+            // WhatsApp may expose its paper-plane button as an icon without a text label.
+            // Accept its known send resource id only after exact composer verification.
+            val isSendIcon = resourceId.equals("send", ignoreCase = true) ||
+                resourceId.equals("send_button", ignoreCase = true)
+            if ((isSendLabel || isSendIcon) && node.isClickable && !node.isEditable && node.isEnabled) return node
             for (index in 0 until node.childCount) {
                 val child = node.getChild(index) ?: continue
                 findSendButton(child)?.let { return it }
