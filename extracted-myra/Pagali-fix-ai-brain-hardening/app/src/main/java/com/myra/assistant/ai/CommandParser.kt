@@ -9,7 +9,7 @@ import com.myra.assistant.model.AppCommand
 object CommandParser {
 
     fun parse(rawInput: String): AppCommand? {
-        val text = rawInput.trim().replace(Regex("""^(?:hey\s+myra|hi\s+myra|hello\s+myra|ok\s+myra|suno\s+myra|हे\s*मायरा|सुनो\s*मायरा)[,،\s]*""", RegexOption.IGNORE_CASE), "").trim()
+        val text = rawInput.trim().replace(Regex("""^(?:hey\s+myra|hi\s+myra|hello\s+myra|ok\s+myra|suno\s+myra|hey\s*मायरा|hi\s*मायरा|hello\s*मायरा|ok\s*मायरा|हे\s*मायरा|सुनो\s*मायरा)[,،\s]*""", RegexOption.IGNORE_CASE), "").trim()
         if (text.isEmpty()) return null
         val lower = text.lowercase()
 
