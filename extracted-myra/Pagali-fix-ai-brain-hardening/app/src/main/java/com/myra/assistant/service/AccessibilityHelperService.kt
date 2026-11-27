@@ -210,9 +210,17 @@ class AccessibilityHelperService : AccessibilityService() {
     fun tapMatchingYouTubeResult(query: String): Boolean {
         val root = rootInActiveWindow ?: return false
         if (root.packageName?.toString() != "com.google.android.youtube") return false
+        // Strip spoken command filler: "Arijit Singh ka gana chalao" should
+        // match the artist/title, not "ka" or "chalao".
+        val stopWords = setOf(
+            "youtube", "play", "song", "songs", "video", "music", "gana", "gaana",
+            "gane", "gaane", "chalao", "bajao", "lagao", "sunao", "sunna",
+            "ka", "ki", "ke", "ko", "par", "mera", "meri", "please",
+            "चलाओ", "बजाओ", "गाना", "गाने", "सुनाओ", "पर", "का", "की", "के",
+        )
         val tokens = query.lowercase()
             .split(Regex("""[^\p{L}\p{N}]+"""))
-            .filter { it.length > 1 && it !in setOf("youtube", "play", "song", "songs", "video", "पर", "चलाओ") }
+            .filter { it.length > 1 && it !in stopWords }
             .distinct()
         if (tokens.isEmpty()) return false
 
@@ -238,6 +246,49 @@ class AccessibilityHelperService : AccessibilityService() {
         return clickNodeOrParent(best.node)
     }
 
+    /**
+     * On a YouTube watch page, taps Play only when an explicit paused-player
+     * control is exposed. If Pause is exposed, playback is already running.
+     * It never taps Play on the search-results screen.
+     */
+    fun startYouTubePlaybackIfPaused(): Boolean {
+        val root = rootInActiveWindow ?: return false
+        if (root.packageName?.toString() != "com.google.android.youtube") return false
+
+        val labels = mutableListOf<String>()
+        fun collect(node: AccessibilityNodeInfo) {
+            listOf(node.text?.toString(), node.contentDescription?.toString())
+                .filterNotNull().map { it.trim().lowercase() }
+                .filter { it.isNotBlank() }.forEach(labels::add)
+            for (index in 0 until node.childCount) {
+                node.getChild(index)?.let(::collect)
+            }
+        }
+        collect(root)
+
+        val hasWatchPage = labels.any { label ->
+            label == "comments" || label.contains("comments") ||
+                label == "subscribe" || label.contains("subscribe") ||
+                label == "description" || label.contains("share")
+        }
+        if (!hasWatchPage) return false
+        if (labels.any { it == "pause" || it == "pause video" || it == "pause playback" }) return true
+
+        fun findPlayControl(node: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+            val label = listOf(node.text?.toString(), node.contentDescription?.toString())
+                .filterNotNull().joinToString(" ").trim().lowercase()
+            val isPlay = label == "play" || label == "play video" ||
+                label == "चलाएं" || label == "चलाएँ" || label == "वीडियो चलाएं" || label == "प्ले"
+            if (isPlay && node.isVisibleToUser && node.isEnabled) return node
+            for (index in 0 until node.childCount) {
+                val child = node.getChild(index) ?: continue
+                findPlayControl(child)?.let { return it }
+            }
+            return null
+        }
+        val play = findPlayControl(root) ?: return false
+        return clickNodeOrParent(play)
+    }
     /**
      * Sends only when the WhatsApp composer contains the exact message that
      * the user just confirmed, and the foreground package is WhatsApp.
