@@ -1,0 +1,12 @@
+<resources>
+    <string name="app_name">MYRA</string>
+    <string name="app_subtitle">AI COMPANION</string>
+    <string name="accessibility_description">Allows MYRA to help you open/close apps, tap on screen text, type in fields, and scroll hands-free upon your voice command.</string>
+    <string name="notification_listener_description">Allows MYRA to detect verification OTPs locally (never stored or shared) and read non-sensitive notification summaries when permitted.</string>
+    <string name="wallpaper_description">Interactive crimson-magenta MYRA neural orb live wallpaper with touch ripples.</string>
+    <string name="channel_overlay_name">MYRA Floating Orb</string>
+    <string name="channel_call_name">MYRA Call Monitor</string>
+    <string name="channel_wake_name">MYRA Voice Trigger</string>
+    <string name="channel_companion_name">MYRA PC Companion</string>
+    <string name="default_status_tap">Tap karke bolo</string>
+</resources>

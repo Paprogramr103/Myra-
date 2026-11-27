@@ -1,0 +1,132 @@
+name: MYRA Android CI
+
+on:
+  push:
+    branches:
+      - main
+      - fix/credential-storage-fail-closed
+      - fix/ai-brain-hardening
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: myra-android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    env:
+      JAVA_TOOL_OPTIONS: -Djava.awt.headless=true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Install Android SDK packages
+        run: |
+          test -d "$ANDROID_HOME/cmdline-tools"
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager -print -quit)"
+          test -n "$SDKMANAGER"
+          echo "$(dirname "$SDKMANAGER")" >> "$GITHUB_PATH"
+          yes | "$SDKMANAGER" --licenses
+          "$SDKMANAGER" --install "platforms;android-36.1" "build-tools;36.0.0"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Verify committed Gradle wrapper JAR
+        run: test -s gradle/wrapper/gradle-wrapper.jar
+
+      - name: Verify official Gradle 9.3.1 wrapper checksum
+        run: echo "b3a875ddc1f044746e1b1a55f645584505f4a10438c1afea9f15e92a7c42ec13  gradle/wrapper/gradle-wrapper.jar" | sha256sum --check -
+
+      - name: Check backend proxy JavaScript syntax
+        run: node --check backend-proxy/server.js
+
+      - name: Run unit and Robolectric tests
+        timeout-minutes: 20
+        run: |
+          for attempt in 1 2 3; do
+            echo "Unit/Robolectric test attempt ${attempt}/3"
+            if timeout 8m ./gradlew --no-daemon --console=plain --stacktrace testDebugUnitTest; then
+              exit 0
+            fi
+            status=$?
+            if [ "$attempt" -lt 3 ]; then
+              delay=$((attempt * 30))
+              echo "Gradle test attempt failed (exit $status); waiting ${delay}s before retry."
+              sleep "$delay"
+            fi
+          done
+          exit 1
+
+      - name: Run SQLCipher migration and recovery tests on Android emulator
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          disk-size: 2G
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -no-snapshot -partition-size 2048
+          pre-emulator-launch-script: |
+            AVD_CONFIG="$HOME/.android/avd/test.avd/config.ini"
+            sed -i '/^disk.dataPartition.size=/d' "$AVD_CONFIG"
+            printf '\\ndisk.dataPartition.size=2G\\n' >> "$AVD_CONFIG"
+            grep -E '^(disk.dataPartition.size|hw.cpu.ncore)=' "$AVD_CONFIG"
+            df -h "$HOME"
+          script: ./gradlew --no-daemon --console=plain connectedDebugAndroidTest
+
+      - name: Run Android lint
+        run: ./gradlew --no-daemon lintDebug
+
+      - name: Restore stable debug signing key
+        uses: actions/cache@v4
+        with:
+          path: debug.keystore
+          key: myra-debug-keystore-v1
+
+      - name: Create debug signing key when missing
+        run: |
+          if [ ! -s debug.keystore ]; then
+            keytool -genkeypair -v -keystore debug.keystore -storepass android \
+              -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 \
+              -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+      - name: Build installable debug APK
+        run: ./gradlew --no-daemon --console=plain assembleDebug
+
+      - name: Generate APK SHA-256
+        run: |
+          cd app/build/outputs/apk/debug
+          sha256sum *.apk > SHA256SUMS.txt
+          ls -lh *.apk SHA256SUMS.txt
+
+      - name: Publish MYRA debug APK as GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: myra-debug-${{ github.run_number }}
+          name: MYRA Debug APK (build ${{ github.run_number }})
+          body: |
+            Automated MYRA Android debug build.
+            Commit: ${{ github.sha }}
+            This is a debug APK for device testing, not a production/Play Store release.
+          prerelease: true
+          files: |
+            app/build/outputs/apk/debug/*.apk
+            app/build/outputs/apk/debug/SHA256SUMS.txt
+          fail_on_unmatched_files: true

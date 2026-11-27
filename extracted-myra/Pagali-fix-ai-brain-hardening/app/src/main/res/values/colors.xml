@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="myra_bg">#050505</color>
+    <color name="myra_surface">#111111</color>
+    <color name="myra_prime_card">#1A0000</color>
+    <color name="myra_red">#FF1744</color>
+    <color name="myra_purple">#D500F9</color>
+    <color name="myra_cyan">#40C4FF</color>
+    <color name="myra_green">#00E676</color>
+    <color name="myra_text_primary">#EEEEEE</color>
+    <color name="myra_text_secondary">#999999</color>
+    <color name="myra_text_hint">#555555</color>
+</resources>
