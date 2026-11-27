@@ -97,6 +97,7 @@ class MyraRobolectricTest {
                     onOpenConnect = {},
                     onOpenScanner = {},
                     onOpenCamera = {},
+                    onOpenMacros = {},
                 )
             }
         }
