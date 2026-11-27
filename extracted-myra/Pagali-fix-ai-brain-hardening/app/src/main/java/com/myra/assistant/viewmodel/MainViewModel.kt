@@ -814,7 +814,7 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         lastPromptedWhatsAppMessage = null
         val result = runCatching { toolsExecutor.execute(AppCommand(AppCommand.WHATSAPP_MSG, mapOf("target" to pending.target, "message" to pending.message))) }
             .getOrElse { ToolExecutionResult(false, it.message?.take(240) ?: "WhatsApp could not be opened.") }
-        val reply = if (result.success) "आपकी पुष्टि मिल गई। ${result.message} मैसेज WhatsApp में तैयार है; भेजने के लिए WhatsApp में Send बटन दबाएँ।" else "आपकी पुष्टि मिली, लेकिन WhatsApp नहीं खुल पाया: ${result.message}"
+        val reply = if (result.success) "आपकी पुष्टि मिल गई। ${result.message}" else "आपकी पुष्टि मिली, लेकिन WhatsApp कार्रवाई पूरी नहीं हो पाई: ${result.message}"
         myraRepo.log(if (result.success) "INFO" else "WARN", "Tool:WHATSAPP_MSG", reply)
         myraRepo.recordActionOutcome(
             commandType = AppCommand.WHATSAPP_MSG,
