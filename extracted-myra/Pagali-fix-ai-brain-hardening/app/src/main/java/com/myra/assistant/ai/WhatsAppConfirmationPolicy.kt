@@ -7,8 +7,10 @@ package com.myra.assistant.ai
 object WhatsAppConfirmationPolicy {
     private val negativePhrases = listOf(
         "nahi", "नहीं", "ना भेजो", "न भेजो", "मत भेजो", "mat bhejo", "मत भेजना", "mat bhejna",
-        "अभी मत भेजो", "nahi bhejna", "no", "not now", "dont send", "don't send",
-        "do not send", "never mind", "cancel", "रद्द", "रोक दो", "stop", "बदल दो", "badal do", "change it",
+        "अभी मत भेजो", "nahi bhejna", "bhejna mat", "भेजना मत", "send mat", "send mat karo",
+        "मत करना", "नहीं चाहिए", "रहने दो", "छोड़ दो", "no", "not now", "dont send", "don't send",
+        "do not send", "never mind", "cancel", "cancel it", "रद्द", "रोक दो", "stop",
+        "बदल दो", "badal do", "change it",
     )
     private val affirmativePhrases = listOf(
         "haan", "हाँ", "जी हाँ", "जी हां", "yes", "okay", "ok", "ठीक है",
@@ -21,7 +23,8 @@ object WhatsAppConfirmationPolicy {
     }
     fun isAffirmative(spokenText: String): Boolean {
         val padded = " " + normalize(spokenText) + " "
-        return affirmativePhrases.any { phrase -> padded.contains(" " + normalize(phrase) + " ") }
+        return negativePhrases.none { phrase -> padded.contains(" " + normalize(phrase) + " ") } &&
+            affirmativePhrases.any { phrase -> padded.contains(" " + normalize(phrase) + " ") }
     }
     private fun normalize(value: String): String = value.lowercase()
         .replace(Regex("""[,.!?।؛:]+"""), " ")
