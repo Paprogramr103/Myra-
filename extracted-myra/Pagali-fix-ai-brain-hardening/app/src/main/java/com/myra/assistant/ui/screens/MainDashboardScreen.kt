@@ -394,7 +394,7 @@ private fun TopHudBar(
             Text(
                 text = "BAT ${uiState.systemStatus.batteryPercent}%${if (uiState.systemStatus.isCharging) "⚡" else ""}",
                 style = MaterialTheme.typography.labelMedium,
-                color = MyraRed,
+                color = MyraAmber,
             )
             Text(
                 text = "${uiState.systemStatus.usedRamMb}/${uiState.systemStatus.totalRamMb}M",
@@ -408,7 +408,12 @@ private fun TopHudBar(
             Text(
                 text = "MYRA",
                 style = MaterialTheme.typography.titleLarge.copy(letterSpacing = 4.sp),
-                color = MyraRed,
+                color = MyraCyan,
+            )
+            Text(
+                text = "YOUR PERSONAL AI COMPANION",
+                style = MaterialTheme.typography.labelSmall,
+                color = MyraTextHint,
             )
             val (dotColor, label) = when (uiState.connectionState) {
                 ConnectionState.CONNECTED -> MyraGreen to "${settings.voice.voiceId} • LIVE"
@@ -451,7 +456,7 @@ private fun TopHudBar(
             Text(
                 text = uiState.systemStatus.timeLabel,
                 style = MaterialTheme.typography.labelMedium,
-                color = MyraRed,
+                color = MyraTextSecondary,
                 modifier = Modifier.padding(end = 2.dp),
             )
             IconButton(
