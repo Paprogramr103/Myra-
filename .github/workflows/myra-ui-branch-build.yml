@@ -7,6 +7,9 @@ on:
     paths:
       - 'extracted-myra/Pagali-fix-ai-brain-hardening/app/src/**'
       - 'extracted-myra/Pagali-fix-ai-brain-hardening/app/build.gradle.kts'
+      - 'extracted-myra/Pagali-fix-ai-brain-hardening/gradle.properties'
+      - 'extracted-myra/Pagali-fix-ai-brain-hardening/gradle/**'
+      - 'extracted-myra/Pagali-fix-ai-brain-hardening/build.gradle.kts'
       - '.github/workflows/myra-ui-branch-build.yml'
   workflow_dispatch:
 
@@ -25,6 +28,8 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
+          cache: gradle
+          cache-dependency-path: extracted-myra/Pagali-fix-ai-brain-hardening/**/*.gradle*
 
       - name: Install Android SDK
         shell: bash
@@ -45,15 +50,37 @@ jobs:
 
       - name: Run unit tests
         working-directory: extracted-myra/Pagali-fix-ai-brain-hardening
+        shell: bash
         run: |
+          set -euo pipefail
           chmod +x ./gradlew
-          ./gradlew --no-daemon --stacktrace testDebugUnitTest
+          for attempt in 1 2 3; do
+            if ./gradlew --no-daemon --no-configuration-cache --stacktrace testDebugUnitTest; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "Gradle test attempt $attempt failed; retrying after Maven Central cooldown."
+              sleep $((attempt * 30))
+            fi
+          done
+          exit 1
 
       - name: Build debug APK
         working-directory: extracted-myra/Pagali-fix-ai-brain-hardening
+        shell: bash
         run: |
+          set -euo pipefail
           chmod +x ./gradlew
-          ./gradlew --no-daemon --stacktrace assembleDebug
+          for attempt in 1 2 3; do
+            if ./gradlew --no-daemon --no-configuration-cache --stacktrace assembleDebug; then
+              exit 0
+            fi
+            if [ "$attempt" -lt 3 ]; then
+              echo "Gradle APK build attempt $attempt failed; retrying after dependency cooldown."
+              sleep $((attempt * 30))
+            fi
+          done
+          exit 1
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v7
