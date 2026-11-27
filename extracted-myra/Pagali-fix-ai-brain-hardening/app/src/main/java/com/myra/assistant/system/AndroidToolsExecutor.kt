@@ -144,24 +144,38 @@ class AndroidToolsExecutor(
                 }
 
                 var selected = false
-                for (attempt in 0 until 7) {
-                    delay(650L)
-                    val service = AccessibilityHelperService.instance
-                    if (service?.tapMatchingYouTubeResult(query) == true) {
+                // Search results may take several seconds to populate on mobile.
+                for (attempt in 0 until 18) {
+                    delay(700L)
+                    if (AccessibilityHelperService.instance?.tapMatchingYouTubeResult(query) == true) {
                         selected = true
                         break
                     }
                 }
-                if (selected) {
-                    ToolExecutionResult(
-                        true,
-                        "YouTube में आपके बोले हुए गाने से मिलता हुआ result चुन दिया है। Playback YouTube ने शुरू किया है या नहीं, यह वहीं जाँचा जा सकता है।",
-                    )
-                } else {
+                if (!selected) {
                     ToolExecutionResult(
                         false,
-                        "YouTube search खुला है, लेकिन सही title को भरोसे से पहचान नहीं पाई। गलत गाना चलाने से बचने के लिए कोई result अपने-आप नहीं चुना।",
+                        "YouTube search खुला है, लेकिन सही गाना नहीं पहचान पाई। MYRA Accessibility Service चालू रखें या गाने का नाम और कलाकार बोलकर दोबारा कोशिश करें।",
                     )
+                } else {
+                    // Selecting a result is not proof of playback. Wait for the
+                    // watch page and use only its explicit Play control if paused.
+                    var playbackStarted = false
+                    for (attempt in 0 until 14) {
+                        delay(650L)
+                        if (AccessibilityHelperService.instance?.startYouTubePlaybackIfPaused() == true) {
+                            playbackStarted = true
+                            break
+                        }
+                    }
+                    if (playbackStarted) {
+                        ToolExecutionResult(true, "YouTube में matching गाना खोलकर Playback शुरू/चालू होने की पुष्टि मिल गई।")
+                    } else {
+                        ToolExecutionResult(
+                            false,
+                            "सही YouTube result खुल गया, लेकिन Playback की पुष्टि नहीं मिली। YouTube में Play दबाएँ; MYRA Accessibility Service और YouTube player controls जाँचें।",
+                        )
+                    }
                 }
             }.getOrElse { ToolExecutionResult(false, "YouTube नहीं खुल पाया: ${it.message}") }
         }
