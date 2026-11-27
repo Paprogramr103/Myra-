@@ -9,6 +9,7 @@ import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.location.Location
 import android.location.LocationManager
+import android.location.Geocoder
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
@@ -28,6 +29,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
 import java.net.URLEncoder
+import java.util.Locale
 import kotlin.coroutines.resume
 
 data class ToolExecutionResult(
@@ -82,6 +84,7 @@ class AndroidToolsExecutor(
             AppCommand.WIFI_SETTINGS -> openWifiPanel()
             AppCommand.BLUETOOTH_SETTINGS -> openBluetoothSettings()
             AppCommand.NAVIGATE_MAPS -> navigateMaps(command.params["destination"].orEmpty())
+            AppCommand.GET_CURRENT_LOCATION -> getCurrentLocationForUser()
             AppCommand.SAVE_PARKING -> saveParkingSpot(command.params["note"].orEmpty())
             AppCommand.FIND_PARKING -> findParkingSpot()
             AppCommand.CAMERA_VISION -> ToolExecutionResult(
@@ -575,6 +578,29 @@ class AndroidToolsExecutor(
     }
 
     @SuppressLint("MissingPermission")
+    private suspend fun getCurrentLocationForUser(): ToolExecutionResult {
+        val hasFine = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        val hasCoarse = ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (!hasFine && !hasCoarse) {
+            return ToolExecutionResult(false, "MYRA को आपकी लोकेशन की अनुमति नहीं मिली है। Android Settings में MYRA → Permissions → Location को Allow while using the app करें।")
+        }
+        val location = runCatching { getBestCurrentLocation() }.getOrNull()
+            ?: return ToolExecutionResult(false, "अभी GPS लोकेशन नहीं मिल रही है। फोन की Location चालू करें और फिर कोशिश करें।")
+        val address = runCatching {
+            if (Geocoder.isPresent()) {
+                @Suppress("DEPRECATION")
+                Geocoder(context, Locale.getDefault()).getFromLocation(location.latitude, location.longitude, 1)
+                    ?.firstOrNull()?.let { place ->
+                        listOfNotNull(place.featureName, place.subLocality, place.locality, place.subAdminArea, place.adminArea)
+                            .filter { it.isNotBlank() }.distinct().joinToString(", ")
+                    }
+            } else null
+        }.getOrNull().orEmpty()
+        val coordinates = "अक्षांश ${"%.5f".format(Locale.US, location.latitude)}, देशांतर ${"%.5f".format(Locale.US, location.longitude)}"
+        val accuracy = if (location.hasAccuracy()) " (लगभग ${location.accuracy.toInt()} मीटर सटीकता)" else ""
+        return ToolExecutionResult(true, "आपकी वर्तमान लोकेशन: ${address.ifBlank { coordinates }}। $coordinates$accuracy")
+    }
+
     private suspend fun saveParkingSpot(note: String): ToolExecutionResult {
         val hasFine = ContextCompat.checkSelfPermission(
             context,
