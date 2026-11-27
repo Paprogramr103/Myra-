@@ -107,6 +107,11 @@ object ToolRegistry {
             requiredParams = listOf("destination"),
         ),
         ToolDefinition(
+            name = "get_current_location",
+            description = "Get the user current device location only when they ask where they are. Use granted foreground location permission; do not claim a location if no fix is available.",
+            commandType = AppCommand.GET_CURRENT_LOCATION,
+        ),
+        ToolDefinition(
             name = "save_parking_spot",
             description = "Save the user's current GPS location as their parked vehicle spot.",
             commandType = AppCommand.SAVE_PARKING,
