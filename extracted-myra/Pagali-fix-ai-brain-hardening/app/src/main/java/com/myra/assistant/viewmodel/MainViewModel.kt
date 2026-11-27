@@ -805,7 +805,14 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return true
         }
         if (!WhatsAppConfirmationPolicy.isAffirmative(spokenText)) {
-            geminiLive?.sendText("Ask in Hindi: 'क्या मैं यही मैसेज भेजने के लिए WhatsApp खोल दूँ? हाँ या नहीं बोलिए।' Do not execute any action.")
+            // The readback prompt is sent once when the message is staged.
+            // Do not ask again for every partial/ambiguous transcript; keep the
+            // pending message unchanged and wait for a clear yes/no response.
+            myraRepo.addChatMessage(
+                "अभी स्पष्ट पुष्टि नहीं मिली। मैसेज नहीं भेजा गया है; तैयार होने पर “हाँ भेज दो” या “नहीं” कहें।",
+                isUser = false,
+                source = "local_tool",
+            )
             return true
         }
         pendingWhatsAppMessage = null
