@@ -21,7 +21,7 @@ object ToolRegistry {
     val definitions: List<ToolDefinition> = listOf(
         ToolDefinition(
             name = "search_play_youtube",
-            description = "Search YouTube for the exact requested song/video, then use the enabled MYRA Accessibility Service to tap a visible matching result only when its title sufficiently matches the query. Never blindly tap an unrelated result. If no confident match is visible, leave results open and report that manual selection is needed.",
+            description = "Play the exact song or video requested. Pass the song title and artist as the search query, excluding voice-command filler such as 'play', 'gana chalao', or 'bajao'. Open YouTube search, use MYRA Accessibility Service to select only a sufficiently matching visible result, then verify the watch page/player and start playback only through an explicit Play control if paused. Never tap an unrelated result or claim playback started without observing a Play/Pause player state.",
             commandType = AppCommand.YOUTUBE_SEARCH_PLAY,
             parameters = mapOf("query" to ("STRING" to "Exact song, artist, or video search query")),
             requiredParams = listOf("query"),
