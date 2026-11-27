@@ -187,6 +187,8 @@ fun SettingsScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
+            item { SettingsSectionHeader("AI & VOICE", "Gemini connection, model, voice and personality") }
+
             // 1. Gemini API & Profile
             item {
                 SettingsCard(title = "GEMINI LIVE & IDENTITY") {
@@ -417,6 +419,8 @@ fun SettingsScreen(
                 }
             }
 
+            item { SettingsSectionHeader("PERSONALIZATION", "Your trusted contacts and assistant identity") }
+
             // 4. Prime Contacts
             item {
                 Card(
@@ -475,6 +479,8 @@ fun SettingsScreen(
                 }
             }
 
+            item { SettingsSectionHeader("CONNECT & BACKGROUND", "Wake word, companion, overlay and live wallpaper") }
+
             // 5. Background Services & Live Wallpaper
             item {
                 SettingsCard(title = "ANDROID SERVICES & LIVE WALLPAPER") {
@@ -527,6 +533,8 @@ fun SettingsScreen(
                     }
                 }
             }
+
+            item { SettingsSectionHeader("AI BRAIN & PRIVACY", "Review, approve and manage what MYRA remembers") }
 
             // Explicit-consent memory controls
             item {
@@ -602,6 +610,8 @@ fun SettingsScreen(
                 }
             }
 
+            item { SettingsSectionHeader("ACTIVITY & BACKUP", "Review actions and protect your MYRA data") }
+
             item {
                 SettingsCard(title = "RECENT ANDROID ACTION HISTORY") {
                     Text(
@@ -672,6 +682,8 @@ fun SettingsScreen(
                     )
                 }
             }
+
+            item { SettingsSectionHeader("PERMISSIONS & SAFETY", "Android access and privacy controls") }
 
             // 6. Special Android Permissions Status
             item {
@@ -861,6 +873,31 @@ fun SettingsScreen(
             dismissButton = {
                 TextButton(onClick = { showAddPrimeDialog = false }) { Text("Cancel") }
             },
+        )
+    }
+}
+
+
+@Composable
+private fun SettingsSectionHeader(title: String, subtitle: String) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 10.dp, bottom = 2.dp)
+            .background(MyraSurface, RoundedCornerShape(14.dp))
+            .border(1.dp, MyraBorderSubtle, RoundedCornerShape(14.dp))
+            .padding(horizontal = 14.dp, vertical = 11.dp),
+        verticalArrangement = Arrangement.spacedBy(3.dp),
+    ) {
+        Text(
+            text = title,
+            color = MyraCyan,
+            style = MaterialTheme.typography.labelLarge,
+        )
+        Text(
+            text = subtitle,
+            color = MyraTextSecondary,
+            style = MaterialTheme.typography.bodySmall,
         )
     }
 }
