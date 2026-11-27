@@ -122,6 +122,19 @@ class CommandParserTest {
         assertEquals(AppCommand.SCAN_BARCODE, CommandParser.parse("barcode scan karo")?.type)
         assertEquals(AppCommand.CAMERA_VISION, CommandParser.parse("camera kholo")?.type)
         assertEquals(AppCommand.CAMERA_VISION, CommandParser.parse("take photo")?.type)
+
+        // Native Hindi commands must reach the same structured actions.
+        assertEquals(AppCommand.FLASHLIGHT_ON, CommandParser.parse("टॉर्च चालू करो")?.type)
+        assertEquals(AppCommand.FLASHLIGHT_OFF, CommandParser.parse("टॉर्च बंद करो")?.type)
+        assertEquals(AppCommand.VOLUME_UP, CommandParser.parse("आवाज़ बढ़ाओ")?.type)
+        assertEquals(AppCommand.VOLUME_DOWN, CommandParser.parse("आवाज़ कम करो")?.type)
+        assertEquals(AppCommand.WIFI_SETTINGS, CommandParser.parse("वाई-फाई सेटिंग खोलो")?.type)
+        assertEquals(AppCommand.BLUETOOTH_SETTINGS, CommandParser.parse("ब्लूटूथ सेटिंग खोलो")?.type)
+        assertEquals(AppCommand.CAMERA_VISION, CommandParser.parse("कैमरा खोलो")?.type)
+        assertEquals(AppCommand.SCAN_BARCODE, CommandParser.parse("क्यूआर कोड स्कैन करो")?.type)
+        val hindiRoute = CommandParser.parse("इंडिया गेट का रास्ता बताओ")
+        assertEquals(AppCommand.NAVIGATE_MAPS, hindiRoute?.type)
+        assertEquals("इंडिया गेट", hindiRoute?.params?.get("destination"))
     }
 
     @Test

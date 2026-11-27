@@ -37,33 +37,44 @@ object CommandParser {
         }
 
         // 2. Flashlight / Torch
-        if (lower.contains("torch") || lower.contains("flashlight") || lower.contains("flash light") || lower.contains("light")) {
-            if (lower.contains("on") || lower.contains("chalu") || lower.contains("jalao")) {
-                return AppCommand(AppCommand.FLASHLIGHT_ON)
-            }
-            if (lower.contains("off") || lower.contains("band") || lower.contains("bujhao")) {
-                return AppCommand(AppCommand.FLASHLIGHT_OFF)
-            }
+        if (lower.contains("torch") || lower.contains("flashlight") || lower.contains("flash light") ||
+            lower.contains("light") || lower.contains("टॉर्च") || lower.contains("फ्लैशलाइट") || lower.contains("लाइट")
+        ) {
+            if (lower.contains("on") || lower.contains("chalu") || lower.contains("jalao") ||
+                lower.contains("चालू") || lower.contains("जलाओ") || lower.contains("जला दो") || lower.contains("ऑन")
+            ) return AppCommand(AppCommand.FLASHLIGHT_ON)
+            if (lower.contains("off") || lower.contains("band") || lower.contains("bujhao") ||
+                lower.contains("बंद") || lower.contains("बुझाओ") || lower.contains("बुझा दो") || lower.contains("ऑफ")
+            ) return AppCommand(AppCommand.FLASHLIGHT_OFF)
         }
 
         // 3. Volume
-        if (lower.contains("volume") || lower.contains("awaz") || lower.contains("sound")) {
-            if (lower.contains("up") || lower.contains("badhao") || lower.contains("increase") || lower.contains("tez") || lower.contains("zyada")) {
-                return AppCommand(AppCommand.VOLUME_UP)
-            }
-            if (lower.contains("down") || lower.contains("kam") || lower.contains("decrease") || lower.contains("slow")) {
-                return AppCommand(AppCommand.VOLUME_DOWN)
-            }
+        if (lower.contains("volume") || lower.contains("awaz") || lower.contains("sound") ||
+            lower.contains("आवाज़") || lower.contains("आवाज") || lower.contains("ध्वनि")
+        ) {
+            if (lower.contains("up") || lower.contains("badhao") || lower.contains("increase") ||
+                lower.contains("tez") || lower.contains("zyada") || lower.contains("बढ़ाओ") ||
+                lower.contains("तेज") || lower.contains("ज़्यादा") || lower.contains("ज्यादा")
+            ) return AppCommand(AppCommand.VOLUME_UP)
+            if (lower.contains("down") || lower.contains("kam") || lower.contains("decrease") ||
+                lower.contains("slow") || lower.contains("कम") || lower.contains("घटाओ") || lower.contains("धीमा")
+            ) return AppCommand(AppCommand.VOLUME_DOWN)
         }
 
         // 4. Wi-Fi & Bluetooth Settings Panels
-        if (lower.contains("wifi") || lower.contains("wi-fi")) {
-            if (lower.contains("on") || lower.contains("off") || lower.contains("setting") || lower.contains("kholo") || lower.contains("band") || lower.contains("chalu")) {
+        if (lower.contains("wifi") || lower.contains("wi-fi") || lower.contains("वाई-फाई") || lower.contains("वाईफाई")) {
+            if (lower.contains("on") || lower.contains("off") || lower.contains("setting") || lower.contains("kholo") ||
+                lower.contains("band") || lower.contains("chalu") || lower.contains("चालू") || lower.contains("बंद") ||
+                lower.contains("सेटिंग") || lower.contains("खोलो")
+            ) {
                 return AppCommand(AppCommand.WIFI_SETTINGS)
             }
         }
-        if (lower.contains("bluetooth")) {
-            if (lower.contains("on") || lower.contains("off") || lower.contains("setting") || lower.contains("kholo") || lower.contains("band") || lower.contains("chalu")) {
+        if (lower.contains("bluetooth") || lower.contains("ब्लूटूथ")) {
+            if (lower.contains("on") || lower.contains("off") || lower.contains("setting") || lower.contains("kholo") ||
+                lower.contains("band") || lower.contains("chalu") || lower.contains("चालू") || lower.contains("बंद") ||
+                lower.contains("सेटिंग") || lower.contains("खोलो")
+            ) {
                 return AppCommand(AppCommand.BLUETOOTH_SETTINGS)
             }
         }
@@ -87,13 +98,18 @@ object CommandParser {
             lower.contains("photo lo") ||
             lower.contains("tasveer lo") ||
             lower.contains("capture photo") ||
-            lower.contains("camera open")
+            lower.contains("camera open") ||
+            (lower.contains("कैमरा") && (lower.contains("खोलो") || lower.contains("खोल") || lower.contains("ओपन"))) ||
+            lower.contains("फोटो लो") || lower.contains("तस्वीर लो") || lower.contains("फोटो खींचो")
         ) {
             return AppCommand(AppCommand.CAMERA_VISION)
         }
 
         // 7. Barcode / QR Scanner
-        if (lower.contains("barcode") || lower.contains("qr code") || lower.contains("qr scan") || lower.contains("scan code")) {
+        if (lower.contains("barcode") || lower.contains("qr code") || lower.contains("qr scan") || lower.contains("scan code") ||
+            lower.contains("बारकोड") || lower.contains("क्यूआर कोड") || lower.contains("क्यूआर स्कैन") ||
+            lower.contains("क्यू आर कोड")
+        ) {
             return AppCommand(AppCommand.SCAN_BARCODE)
         }
 
@@ -103,6 +119,11 @@ object CommandParser {
             if (dest.isNotEmpty()) return AppCommand(AppCommand.NAVIGATE_MAPS, mapOf("destination" to dest))
         }
         Regex("""^(.+?)\s+(?:ka\s+rasta|directions|navigate)\s+(?:dikhao|batao|chalo)$""", RegexOption.IGNORE_CASE).find(text)?.let {
+            val dest = it.groupValues[1].trim()
+            if (dest.isNotEmpty()) return AppCommand(AppCommand.NAVIGATE_MAPS, mapOf("destination" to dest))
+        }
+
+        Regex("""^(.+?)\\s+का रास्ता\\s+(?:दिखाओ|बताओ)$""").find(text)?.let {
             val dest = it.groupValues[1].trim()
             if (dest.isNotEmpty()) return AppCommand(AppCommand.NAVIGATE_MAPS, mapOf("destination" to dest))
         }
