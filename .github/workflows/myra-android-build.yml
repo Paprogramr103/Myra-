@@ -1,0 +1,92 @@
+name: Extract MYRA ZIP and build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'Pagali-fix-ai-brain-hardening.zip'
+      - '.github/workflows/myra-android-build.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  extract-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Extract ZIP into extracted-myra
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f Pagali-fix-ai-brain-hardening.zip
+          mkdir -p extracted-myra
+          unzip -oq Pagali-fix-ai-brain-hardening.zip -d extracted-myra
+          echo "Extracted files:"
+          find extracted-myra -type f | sort | head -300
+          echo "Total files: $(find extracted-myra -type f | wc -l)"
+
+      - name: Locate Android Gradle project
+        id: project
+        shell: bash
+        run: |
+          set -euo pipefail
+          WRAPPER="$(find extracted-myra -type f -name gradlew -print -quit)"
+          if [ -z "$WRAPPER" ]; then
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No gradlew wrapper found. This ZIP may not contain a complete Android Gradle project."
+            exit 0
+          fi
+          PROJECT_DIR="$(dirname "$WRAPPER")"
+          echo "found=true" >> "$GITHUB_OUTPUT"
+          echo "dir=$PROJECT_DIR" >> "$GITHUB_OUTPUT"
+          chmod +x "$WRAPPER"
+          echo "Project directory: $PROJECT_DIR"
+          find "$PROJECT_DIR" -maxdepth 3 -type f | sort | head -300
+
+      - name: Build debug APK
+        if: steps.project.outputs.found == 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "${{ steps.project.outputs.dir }}"
+          ./gradlew --no-daemon --stacktrace assembleDebug
+
+      - name: Upload APK
+        if: always() && steps.project.outputs.found == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: MYRA-debug-apk
+          path: extracted-myra/**/build/outputs/apk/debug/*.apk
+          if-no-files-found: warn
+          retention-days: 14
+
+      - name: Commit extracted source into repository
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add extracted-myra
+          if git diff --cached --quiet; then
+            echo "No extracted source changes to commit."
+          else
+            git commit -m "Extract MYRA Android source from uploaded ZIP"
+            git push
+          fi
