@@ -6,8 +6,9 @@ package com.myra.assistant.ai
  */
 object WhatsAppConfirmationPolicy {
     private val negativePhrases = listOf(
-        "nahi", "नहीं", "ना भेजो", "मत भेजो", "mat bhejo", "मत भेजना",
-        "cancel", "रद्द", "रोक दो", "stop", "बदल दो", "badal do", "change it",
+        "nahi", "नहीं", "ना भेजो", "न भेजो", "मत भेजो", "mat bhejo", "मत भेजना", "mat bhejna",
+        "अभी मत भेजो", "nahi bhejna", "no", "not now", "dont send", "don't send",
+        "do not send", "never mind", "cancel", "रद्द", "रोक दो", "stop", "बदल दो", "badal do", "change it",
     )
     private val affirmativePhrases = listOf(
         "haan", "हाँ", "जी हाँ", "जी हां", "yes", "okay", "ok", "ठीक है",
