@@ -30,6 +30,13 @@ class CommandParserTest {
     }
 
     @Test
+    fun `strips mixed script MYRA wake phrases before parsing commands`() {
+        assertEquals(AppCommand.FLASHLIGHT_ON, CommandParser.parse("Hey मायरा, टॉर्च चालू करो")?.type)
+        assertEquals(AppCommand.FLASHLIGHT_OFF, CommandParser.parse("हे MYRA टॉर्च बंद करो")?.type)
+        assertEquals(AppCommand.VOLUME_UP, CommandParser.parse("Hi मायरा आवाज़ बढ़ाओ")?.type)
+    }
+
+    @Test
     fun `parses calls sms whatsapp and prime contacts`() {
         val prime0 = CommandParser.parse("mere close friend ko call karo")
         assertEquals(AppCommand.PRIME_CALL, prime0?.type)
