@@ -11,11 +11,13 @@ class WhatsAppConfirmationPolicyTest {
         assertTrue(WhatsAppConfirmationPolicy.isAffirmative("हाँ, भेज दो"))
         assertTrue(WhatsAppConfirmationPolicy.isAffirmative("जी हाँ भेज दीजिए"))
     }
+
     @Test fun englishAndHinglishConfirmationIsAccepted() {
         assertTrue(WhatsAppConfirmationPolicy.isAffirmative("haan bhej do"))
         assertTrue(WhatsAppConfirmationPolicy.isAffirmative("yes send it"))
         assertTrue(WhatsAppConfirmationPolicy.isAffirmative("theek hai"))
     }
+
     @Test fun refusalTakesPrecedenceOverConfirmation() {
         assertTrue(WhatsAppConfirmationPolicy.isNegative("हाँ नहीं भेजना"))
         assertTrue(WhatsAppConfirmationPolicy.isNegative("मत भेजो"))
@@ -24,7 +26,19 @@ class WhatsAppConfirmationPolicyTest {
         assertTrue(WhatsAppConfirmationPolicy.isNegative("not now"))
         assertTrue(WhatsAppConfirmationPolicy.isNegative("अभी मत भेजो"))
         assertTrue(WhatsAppConfirmationPolicy.isNegative("haan, mat bhejna"))
+        assertFalse(WhatsAppConfirmationPolicy.isAffirmative("haan, mat bhejna"))
     }
+
+    @Test fun additionalHindiAndHinglishRefusalsAreRecognized() {
+        assertTrue(WhatsAppConfirmationPolicy.isNegative("भेजना मत"))
+        assertTrue(WhatsAppConfirmationPolicy.isNegative("bhejna mat"))
+        assertTrue(WhatsAppConfirmationPolicy.isNegative("send mat karo"))
+        assertTrue(WhatsAppConfirmationPolicy.isNegative("रहने दो"))
+        assertTrue(WhatsAppConfirmationPolicy.isNegative("छोड़ दो"))
+        assertTrue(WhatsAppConfirmationPolicy.isNegative("cancel it"))
+        assertFalse(WhatsAppConfirmationPolicy.isAffirmative("हाँ, रहने दो"))
+    }
+
     @Test fun unrelatedSpeechIsNotConfirmation() {
         assertFalse(WhatsAppConfirmationPolicy.isAffirmative("शायद बाद में"))
         assertFalse(WhatsAppConfirmationPolicy.isAffirmative("उसको अभी मत बताना"))
