@@ -6,6 +6,7 @@ on:
       - feature/maya-inspired-ui-settings
     paths:
       - 'extracted-myra/Pagali-fix-ai-brain-hardening/app/src/**'
+      - 'extracted-myra/Pagali-fix-ai-brain-hardening/app/build.gradle.kts'
       - '.github/workflows/myra-ui-branch-build.yml'
   workflow_dispatch:
 
