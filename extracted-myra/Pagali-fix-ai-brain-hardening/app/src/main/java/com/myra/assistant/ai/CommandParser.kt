@@ -123,7 +123,7 @@ object CommandParser {
             if (dest.isNotEmpty()) return AppCommand(AppCommand.NAVIGATE_MAPS, mapOf("destination" to dest))
         }
 
-        Regex("""^(.+?)\\s+का रास्ता\\s+(?:दिखाओ|बताओ)$""").find(text)?.let {
+        Regex("""^(.+?)\s+का रास्ता\s+(?:दिखाओ|बताओ)$""").find(text)?.let {
             val dest = it.groupValues[1].trim()
             if (dest.isNotEmpty()) return AppCommand(AppCommand.NAVIGATE_MAPS, mapOf("destination" to dest))
         }
