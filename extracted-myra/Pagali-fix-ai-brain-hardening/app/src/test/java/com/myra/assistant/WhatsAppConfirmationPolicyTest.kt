@@ -20,9 +20,15 @@ class WhatsAppConfirmationPolicyTest {
         assertTrue(WhatsAppConfirmationPolicy.isNegative("हाँ नहीं भेजना"))
         assertTrue(WhatsAppConfirmationPolicy.isNegative("मत भेजो"))
         assertFalse(WhatsAppConfirmationPolicy.isAffirmative("नहीं भेजो"))
+        assertTrue(WhatsAppConfirmationPolicy.isNegative("no, don't send it"))
+        assertTrue(WhatsAppConfirmationPolicy.isNegative("not now"))
+        assertTrue(WhatsAppConfirmationPolicy.isNegative("अभी मत भेजो"))
+        assertTrue(WhatsAppConfirmationPolicy.isNegative("haan, mat bhejna"))
     }
     @Test fun unrelatedSpeechIsNotConfirmation() {
         assertFalse(WhatsAppConfirmationPolicy.isAffirmative("शायद बाद में"))
         assertFalse(WhatsAppConfirmationPolicy.isAffirmative("उसको अभी मत बताना"))
+        assertFalse(WhatsAppConfirmationPolicy.isAffirmative("yesterday was nice"))
+        assertFalse(WhatsAppConfirmationPolicy.isAffirmative(""))
     }
 }
