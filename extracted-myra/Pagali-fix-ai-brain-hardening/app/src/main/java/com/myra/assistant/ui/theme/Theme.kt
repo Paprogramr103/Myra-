@@ -5,13 +5,13 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.runtime.Composable
 
 private val MyraDarkColorScheme = darkColorScheme(
-    primary = MyraRed,
-    onPrimary = MyraTextPrimary,
+    primary = MyraCyan,
+    onPrimary = MyraVoid,
     primaryContainer = MyraPrimeCard,
     onPrimaryContainer = MyraTextPrimary,
     secondary = MyraPurple,
     onSecondary = MyraTextPrimary,
-    tertiary = MyraCyan,
+    tertiary = MyraGreen,
     background = MyraVoid,
     onBackground = MyraTextPrimary,
     surface = MyraSurface,
