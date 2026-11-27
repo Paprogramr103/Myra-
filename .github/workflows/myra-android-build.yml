@@ -26,9 +26,6 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
       - name: Extract ZIP into extracted-myra
         shell: bash
         run: |
@@ -39,6 +36,14 @@ jobs:
           echo "Extracted files:"
           find extracted-myra -type f | sort | head -300
           echo "Total files: $(find extracted-myra -type f | wc -l)"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: |
+            platform-tools
+            platforms;android-35
+            build-tools;35.0.0
 
       - name: Locate Android Gradle project
         id: project
