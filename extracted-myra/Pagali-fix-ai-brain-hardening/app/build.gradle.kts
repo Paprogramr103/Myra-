@@ -119,7 +119,10 @@ dependencies {
   // implementation(libs.retrofit)
   implementation(libs.zxing.core)
   // Offline keyword spotting engine; Android native libraries are supplied by the official artifact.
-  implementation("com.github.k2-fsa:sherpa-onnx:v1.13.5")
+  implementation("com.github.k2-fsa:sherpa-onnx:v1.13.5") {
+    // The Android AAR already bundles the Kotlin API classes; avoid the duplicate JVM artifact.
+    exclude(group = "com.github.k2-fsa.sherpa-onnx", module = "sherpa-onnx-jvm")
+  }
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)
