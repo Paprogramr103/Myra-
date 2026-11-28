@@ -18,14 +18,11 @@ import android.os.Handler
 import android.os.Looper
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
-import com.k2fsa.sherpa.onnx.KeywordSpotter
-import com.k2fsa.sherpa.onnx.KeywordSpotterConfig
-import com.k2fsa.sherpa.onnx.OnlineStream
-import com.k2fsa.sherpa.onnx.getFeatureConfig
-import com.k2fsa.sherpa.onnx.getKwsModelConfig
 import com.myra.assistant.R
 import com.myra.assistant.ui.main.MainActivity
 import java.util.concurrent.atomic.AtomicBoolean
+import org.vosk.Model
+import org.vosk.Recognizer
 import kotlin.concurrent.thread
 import kotlin.math.max
 import kotlinx.coroutines.flow.asStateFlow
@@ -116,24 +113,26 @@ class WakeWordService : Service() {
     }
 
     private fun runKeywordSpotter() {
-        var spotter: KeywordSpotter? = null
-        var stream: OnlineStream? = null
+        var model: Model? = null
+        var recognizer: Recognizer? = null
         var detected = false
         try {
-            val modelConfig = getKwsModelConfig(type = MODEL_TYPE)
-                ?: error("English keyword model configuration is unavailable")
-            val config = KeywordSpotterConfig(
-                featConfig = getFeatureConfig(sampleRate = SAMPLE_RATE, featureDim = FEATURE_DIM),
-                modelConfig = modelConfig,
-                keywordsFile = KEYWORDS_FILE,
-                keywordsScore = 1.5f,
-                keywordsThreshold = 0.25f,
-                numTrailingBlanks = 2,
-            )
-            val activeSpotter = KeywordSpotter(assetManager = assets, config = config)
-            spotter = activeSpotter
-            val activeStream = activeSpotter.createStream()
-            stream = activeStream
+            val modelDirectory = ensureHindiModelDirectory()
+            val activeModel = Model(modelDirectory.absolutePath)
+            model = activeModel
+            val grammar = org.json.JSONArray().apply {
+                put("हे मायरा")
+                put("सुनो मायरा")
+                put("हाय मायरा")
+                put("हेलो मायरा")
+                put("hey myra")
+                put("hi myra")
+                put("hello myra")
+                put("[unk]")
+            }.toString()
+            val activeRecognizer = Recognizer(activeModel, SAMPLE_RATE.toFloat(), grammar)
+            recognizer = activeRecognizer
+            activeRecognizer.setWords(false)
 
             val minimumBuffer = AudioRecord.getMinBufferSize(
                 SAMPLE_RATE,
@@ -155,10 +154,11 @@ class WakeWordService : Service() {
             }
             audioRecord = recorder
             recorder.startRecording()
-            _statusNote.value = "Offline wake-word listening active — say Hey MYRA or SUNO MYRA."
-            updateNotification("Offline listening active for Hey MYRA / SUNO MYRA aliases.")
+            _statusNote.value = "Hindi offline wake listening active — कहें ‘हे मायरा’ या ‘सुनो मायरा’।"
+            updateNotification("Hindi offline listening: हे मायरा / सुनो मायरा")
 
             val pcm = ShortArray(CHUNK_SAMPLES)
+            val pcmBytes = ByteArray(CHUNK_SAMPLES * 2)
             while (shouldListen.get()) {
                 val count = recorder.read(pcm, 0, pcm.size)
                 if (count == AudioRecord.ERROR_DEAD_OBJECT || count == AudioRecord.ERROR_INVALID_OPERATION) {
@@ -166,33 +166,36 @@ class WakeWordService : Service() {
                 }
                 if (count <= 0) continue
 
-                val samples = FloatArray(count) { index -> pcm[index] / 32768.0f }
-                activeStream.acceptWaveform(samples, sampleRate = SAMPLE_RATE)
-                while (activeSpotter.isReady(activeStream)) {
-                    activeSpotter.decode(activeStream)
-                    val keyword = activeSpotter.getResult(activeStream).keyword
-                    if (keyword.isNotBlank()) {
-                        val now = System.currentTimeMillis()
-                        if (now - lastWakeTriggerAtMs >= WAKE_TRIGGER_COOLDOWN_MS) {
-                            lastWakeTriggerAtMs = now
-                            detected = true
-                            shouldListen.set(false)
-                            break
-                        }
-                        activeSpotter.reset(activeStream)
+                for (index in 0 until count) {
+                    val sample = pcm[index].toInt()
+                    pcmBytes[index * 2] = (sample and 0xff).toByte()
+                    pcmBytes[index * 2 + 1] = ((sample shr 8) and 0xff).toByte()
+                }
+                val isFinal = activeRecognizer.acceptWaveForm(pcmBytes, count * 2)
+                val resultJson = if (isFinal) activeRecognizer.result else activeRecognizer.partialResult
+                val recognized = runCatching {
+                    val result = org.json.JSONObject(resultJson)
+                    result.optString(if (isFinal) "text" else "partial")
+                }.getOrDefault("")
+                if (isHindiWakePhrase(recognized)) {
+                    val now = System.currentTimeMillis()
+                    if (now - lastWakeTriggerAtMs >= WAKE_TRIGGER_COOLDOWN_MS) {
+                        lastWakeTriggerAtMs = now
+                        detected = true
+                        shouldListen.set(false)
+                        break
                     }
                 }
-                if (detected) break
             }
         } catch (error: Exception) {
             if (shouldListen.get()) {
-                _statusNote.value = "Offline wake-word engine could not start: ${error.message ?: error.javaClass.simpleName}"
-                updateNotification("Wake-word engine unavailable. Open MYRA to retry.")
+                _statusNote.value = "Hindi offline wake engine could not start: \${error.message ?: error.javaClass.simpleName}"
+                updateNotification("Hindi wake model unavailable. Open MYRA to retry.")
             }
         } finally {
             shouldListen.set(false)
-            runCatching { stream?.release() }
-            runCatching { spotter?.release() }
+            runCatching { recognizer?.close() }
+            runCatching { model?.close() }
             audioRecord?.let { recorder ->
                 runCatching { if (recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING) recorder.stop() }
                 runCatching { recorder.release() }
@@ -206,6 +209,47 @@ class WakeWordService : Service() {
         }
     }
 
+    private fun ensureHindiModelDirectory(): java.io.File {
+        val destination = java.io.File(filesDir, "models/$MODEL_ASSET_DIR")
+        val marker = java.io.File(destination, "uuid")
+        val expectedMarker = assets.open("$MODEL_ASSET_DIR/uuid").bufferedReader().use { it.readLine() }
+        val installedMarker = runCatching { marker.readText().trim() }.getOrNull()
+        if (installedMarker != expectedMarker) {
+            destination.deleteRecursively()
+            copyAssetDirectory(MODEL_ASSET_DIR, destination)
+        }
+        check(java.io.File(destination, "am/final.mdl").isFile) {
+            "Hindi Vosk acoustic model is incomplete"
+        }
+        return destination
+    }
+
+    private fun copyAssetDirectory(assetPath: String, destination: java.io.File) {
+        val children = assets.list(assetPath).orEmpty()
+        if (children.isEmpty()) {
+            destination.parentFile?.mkdirs()
+            assets.open(assetPath).use { input ->
+                destination.outputStream().use { output -> input.copyTo(output) }
+            }
+            return
+        }
+        destination.mkdirs()
+        children.forEach { child ->
+            copyAssetDirectory("$assetPath/$child", java.io.File(destination, child))
+        }
+    }
+
+    private fun isHindiWakePhrase(raw: String): Boolean {
+        val text = raw.lowercase(java.util.Locale.ROOT)
+            .replace(Regex("[^\\p{L}\\p{N}\\s]"), " ")
+            .replace(Regex("\\s+"), " ")
+            .trim()
+        if (text.isBlank()) return false
+        val hasName = text.contains("मायरा") || text.contains("myra") || text.contains("mayra")
+        val hasCallWord = listOf("हे", "सुनो", "हाय", "हेलो", "hey", "hi", "hello").any(text::contains)
+        return hasName && hasCallWord
+    }
+
     private fun stopListening() {
         shouldListen.set(false)
         audioRecord?.let { recorder ->
@@ -216,8 +260,8 @@ class WakeWordService : Service() {
     }
 
     private fun onWakePhraseDetected() {
-        _statusNote.value = "HEY MYRA detected. Opening the assistant; microphone capture has been released."
-        updateNotification("HEY MYRA detected — opening MYRA.")
+        _statusNote.value = "Hindi wake phrase detected. Opening the assistant; microphone capture has been released."
+        updateNotification("Hindi wake phrase detected — opening MYRA.")
         val launch = Intent(this, MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             putExtra(EXTRA_WAKE_TRIGGERED, true)
@@ -271,7 +315,7 @@ class WakeWordService : Service() {
         )
         return NotificationCompat.Builder(this, WAKE_ALERT_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_myra_notif)
-            .setContentTitle("Hey MYRA detected")
+            .setContentTitle("MYRA wake phrase detected")
             .setContentText("Tap to start MYRA if Android did not open it automatically.")
             .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -288,7 +332,7 @@ class WakeWordService : Service() {
     }
 
     private fun buildNotification(
-        contentText: String = "Offline wake-word listening for Hey MYRA / SUNO MYRA",
+        contentText: String = "Hindi offline wake listening: हे मायरा / सुनो मायरा",
     ): Notification {
         val launchIntent = Intent(this, MainActivity::class.java)
         val openIntent = PendingIntent.getActivity(
@@ -314,9 +358,7 @@ class WakeWordService : Service() {
     }
 
     companion object {
-        private const val MODEL_TYPE = 1 // GigaSpeech English KWS model
-        private const val MODEL_DIR = "sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01"
-        private const val KEYWORDS_FILE = "$MODEL_DIR/keywords.txt"
+        private const val MODEL_ASSET_DIR = "vosk-model-small-hi-0.22"
         private const val SAMPLE_RATE = 16_000
         private const val FEATURE_DIM = 80
         private const val CHUNK_SAMPLES = 1_600
@@ -336,7 +378,7 @@ class WakeWordService : Service() {
             private set
 
         private val _statusNote = kotlinx.coroutines.flow.MutableStateFlow(
-            "Inactive (offline HEY MYRA model is loaded by the app build)",
+            "Inactive (offline Hindi wake model is loaded by the app build)",
         )
         val statusNote: kotlinx.coroutines.flow.StateFlow<String> = _statusNote.asStateFlow()
     }
