@@ -9,38 +9,39 @@ import android.app.Service
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
+import android.media.AudioFormat
+import android.media.AudioRecord
+import android.media.MediaRecorder
 import android.os.Build
-import android.os.Bundle
-import android.os.Handler
 import android.os.IBinder
+import android.os.Handler
 import android.os.Looper
-import android.speech.RecognitionListener
-import android.speech.RecognizerIntent
-import android.speech.SpeechRecognizer
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import com.k2fsa.sherpa.onnx.KeywordSpotter
+import com.k2fsa.sherpa.onnx.KeywordSpotterConfig
+import com.k2fsa.sherpa.onnx.OnlineStream
+import com.k2fsa.sherpa.onnx.getFeatureConfig
+import com.k2fsa.sherpa.onnx.getKwsModelConfig
 import com.myra.assistant.R
 import com.myra.assistant.ui.main.MainActivity
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
+import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.concurrent.thread
+import kotlin.math.max
 
 /**
- * Permission-based Foreground Voice-Trigger Service.
+ * Permission-based offline wake-word foreground service.
  *
- * IMPORTANT TRANSPARENCY NOTE:
- * Android does not provide a built-in always-on offline neural hotword engine without bundling
- * a proprietary wake-word model (.ppn / .tflite). This foreground service uses Android's
- * SpeechRecognizer while the persistent notification is active and RECORD_AUDIO is granted,
- * and clearly reports its true mode in status and Diagnostics.
+ * The English GigaSpeech KWS model and the custom HEY MYRA keyword file are packaged
+ * into the CI-built APK. This service owns the microphone only while the app is in
+ * the background. MainActivity pauses this service before Gemini Live takes the mic.
  */
 class WakeWordService : Service() {
 
     private val mainHandler = Handler(Looper.getMainLooper())
-    private var speechRecognizer: SpeechRecognizer? = null
-    private var usingOnDeviceRecognizer = false
-    private var recognitionLanguage = "en-IN"
-    private var isListeningLoopActive = false
+    private val shouldListen = AtomicBoolean(false)
+    @Volatile private var audioRecord: AudioRecord? = null
+    @Volatile private var workerThread: Thread? = null
     private var lastWakeTriggerAtMs = 0L
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -52,6 +53,8 @@ class WakeWordService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         if (intent?.action == ACTION_STOP) {
+            stopListening()
+            stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
             return START_NOT_STICKY
         }
@@ -62,196 +65,193 @@ class WakeWordService : Service() {
         ) == PackageManager.PERMISSION_GRANTED
         if (!hasMic) {
             isRunning = false
-            _statusNote.value = "Blocked: RECORD_AUDIO permission required."
+            _statusNote.value = "Blocked: microphone permission is required."
             stopSelf()
             return START_NOT_STICKY
         }
 
-        val notif = buildNotification()
         try {
+            val notification = buildNotification()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                startForeground(NOTIF_ID, notif, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
+                startForeground(NOTIF_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE)
             } else {
-                startForeground(NOTIF_ID, notif)
+                startForeground(NOTIF_ID, notification)
             }
             isRunning = true
-        } catch (e: Exception) {
+        } catch (error: Exception) {
             isRunning = false
-            _statusNote.value = "Foreground service start blocked by OS (${e.javaClass.simpleName})."
+            _statusNote.value = "Android blocked microphone foreground service: ${error.javaClass.simpleName}"
             stopSelf()
             return START_NOT_STICKY
         }
 
         when (intent?.action) {
             ACTION_PAUSE -> pauseListening()
-            ACTION_RESUME -> startVoiceTriggerLoop()
-            else -> startVoiceTriggerLoop()
+            ACTION_RESUME -> startKeywordSpotting()
+            else -> startKeywordSpotting()
         }
         return START_STICKY
     }
 
     private fun pauseListening() {
-        isListeningLoopActive = false
-        mainHandler.removeCallbacksAndMessages(null)
-        runCatching { speechRecognizer?.cancel() }
-        runCatching { speechRecognizer?.destroy() }
-        speechRecognizer = null
-        _statusNote.value = "Paused while MYRA app is in foreground."
-        getSystemService(NotificationManager::class.java).cancel(WAKE_ALERT_NOTIF_ID)
+        stopListening()
+        _statusNote.value = "Paused while MYRA is in foreground; Gemini may use the microphone."
         updateNotification("Wake listening paused while MYRA is open.")
+        getSystemService(NotificationManager::class.java).cancel(WAKE_ALERT_NOTIF_ID)
     }
 
-    private fun startVoiceTriggerLoop() {
-        if (isListeningLoopActive) return
-        if (!SpeechRecognizer.isRecognitionAvailable(this)) {
-            _statusNote.value = "OS SpeechRecognizer unavailable on this device (offline hotword model not bundled)."
-            updateNotification("Speech recognition unavailable on this device.")
-            return
+    private fun startKeywordSpotting() {
+        if (shouldListen.get() || workerThread?.isAlive == true) return
+        shouldListen.set(true)
+        _statusNote.value = "Loading offline HEY MYRA model..."
+        updateNotification("Loading offline wake-word model...")
+        workerThread = thread(name = "MYRA-Offline-WakeWord", isDaemon = true) {
+            runKeywordSpotter()
         }
-        isListeningLoopActive = true
-        _statusNote.value = "Starting Android speech recognition for 'Hey MYRA'."
-        updateNotification("Starting wake phrase recognition...")
-        mainHandler.post { initAndStartRecognizer() }
     }
 
-    private fun initAndStartRecognizer() {
-        if (!isListeningLoopActive) return
-        runCatching { speechRecognizer?.destroy() }
-        val recognizer = if (
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.S &&
-            SpeechRecognizer.isOnDeviceRecognitionAvailable(this)
-        ) {
-            runCatching { SpeechRecognizer.createOnDeviceSpeechRecognizer(this) }
-                .onSuccess { usingOnDeviceRecognizer = true }
-                .getOrElse {
-                    usingOnDeviceRecognizer = false
-                    SpeechRecognizer.createSpeechRecognizer(this)
-                }
-        } else {
-            usingOnDeviceRecognizer = false
-            SpeechRecognizer.createSpeechRecognizer(this)
-        }
-        speechRecognizer = recognizer
-        _statusNote.value = if (usingOnDeviceRecognizer) {
-            "On-device SpeechRecognizer active; say 'Hey MYRA'. Not a dedicated hotword model."
-        } else {
-            "OS SpeechRecognizer active; this device may use network recognition. Not an offline hotword model."
-        }
-        updateNotification(
-            if (usingOnDeviceRecognizer) "On-device recognition active for 'Hey MYRA'."
-            else "OS speech recognition active for 'Hey MYRA'.",
-        )
+    private fun runKeywordSpotter() {
+        var spotter: KeywordSpotter? = null
+        var stream: OnlineStream? = null
+        var detected = false
+        try {
+            val modelConfig = getKwsModelConfig(type = MODEL_TYPE)
+                ?: error("English keyword model configuration is unavailable")
+            val config = KeywordSpotterConfig(
+                featConfig = getFeatureConfig(sampleRate = SAMPLE_RATE, featureDim = FEATURE_DIM),
+                modelConfig = modelConfig,
+                keywordsFile = KEYWORDS_FILE,
+                keywordsScore = 1.5f,
+                keywordsThreshold = 0.25f,
+                numTrailingBlanks = 2,
+            )
+            spotter = KeywordSpotter(assetManager = assets, config = config)
+            stream = spotter.createStream()
 
-        recognizer.setRecognitionListener(object : RecognitionListener {
-            override fun onReadyForSpeech(params: Bundle?) {}
-            override fun onBeginningOfSpeech() {}
-            override fun onRmsChanged(rmsdB: Float) {}
-            override fun onBufferReceived(buffer: ByteArray?) {}
-            override fun onEndOfSpeech() {}
-            override fun onPartialResults(partialResults: Bundle?) {
-                checkMatches(partialResults)
+            val minimumBuffer = AudioRecord.getMinBufferSize(
+                SAMPLE_RATE,
+                AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT,
+            )
+            check(minimumBuffer > 0) { "Android could not allocate a 16 kHz microphone buffer ($minimumBuffer)" }
+
+            val recorder = AudioRecord(
+                MediaRecorder.AudioSource.VOICE_RECOGNITION,
+                SAMPLE_RATE,
+                AudioFormat.CHANNEL_IN_MONO,
+                AudioFormat.ENCODING_PCM_16BIT,
+                max(minimumBuffer * 2, SAMPLE_RATE * 2),
+            )
+            check(recorder.state == AudioRecord.STATE_INITIALIZED) {
+                recorder.release()
+                "Android microphone could not be initialized"
             }
-            override fun onEvent(eventType: Int, params: Bundle?) {}
+            audioRecord = recorder
+            recorder.startRecording()
+            _statusNote.value = "Offline wake-word listening active — say Hey MYRA."
+            updateNotification("Offline listening active for “Hey MYRA”.")
 
-            override fun onResults(results: Bundle?) {
-                val triggered = checkMatches(results)
-                if (!triggered && isListeningLoopActive) {
-                    scheduleRestart(350L)
+            val pcm = ShortArray(CHUNK_SAMPLES)
+            while (shouldListen.get()) {
+                val count = recorder.read(pcm, 0, pcm.size)
+                if (count == AudioRecord.ERROR_DEAD_OBJECT || count == AudioRecord.ERROR_INVALID_OPERATION) {
+                    error("Microphone capture stopped (AudioRecord=$count)")
                 }
-            }
+                if (count <= 0) continue
 
-            override fun onError(error: Int) {
-                if (isListeningLoopActive) {
-                    val delay = if (error == SpeechRecognizer.ERROR_RECOGNIZER_BUSY) 1200L else 600L
-                    scheduleRestart(delay)
+                val samples = FloatArray(count) { index -> pcm[index] / 32768.0f }
+                stream.acceptWaveform(samples, sampleRate = SAMPLE_RATE)
+                while (spotter.isReady(stream)) {
+                    spotter.decode(stream)
+                    val keyword = spotter.getResult(stream).keyword
+                    if (keyword.isNotBlank()) {
+                        val now = System.currentTimeMillis()
+                        if (now - lastWakeTriggerAtMs >= WAKE_TRIGGER_COOLDOWN_MS) {
+                            lastWakeTriggerAtMs = now
+                            detected = true
+                            shouldListen.set(false)
+                            break
+                        }
+                        spotter.reset(stream)
+                    }
                 }
+                if (detected) break
             }
-        })
-
-        val listenIntent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
-            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, true)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, recognitionLanguage)
+        } catch (error: Exception) {
+            if (shouldListen.get()) {
+                _statusNote.value = "Offline wake-word engine could not start: ${error.message ?: error.javaClass.simpleName}"
+                updateNotification("Wake-word engine unavailable. Open MYRA to retry.")
+            }
+        } finally {
+            shouldListen.set(false)
+            runCatching { stream?.release() }
+            runCatching { spotter?.release() }
+            audioRecord?.let { recorder ->
+                runCatching { if (recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING) recorder.stop() }
+                runCatching { recorder.release() }
+            }
+            audioRecord = null
+            workerThread = null
         }
-        runCatching { recognizer.startListening(listenIntent) }
-            .onFailure { scheduleRestart(1500L) }
+
+        if (detected) {
+            mainHandler.post { onWakePhraseDetected() }
+        }
     }
 
-    private fun checkMatches(bundle: Bundle?): Boolean {
-        if (!isListeningLoopActive) return false
-        val matches = bundle?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty()
-        val wakePhrases = listOf(
-            "hey myra", "hi myra", "hello myra", "ok myra", "okay myra",
-            "hey mira", "hi mira", "hello mira", "ok mira", "okay mira",
-            "hey मायरा", "hi मायरा", "hello मायरा", "ओके मायरा", "हे मायरा",
-            "सुनो मायरा", "हाय मायरा", "हेलो मायरा",
-        )
-        val matched = matches.any { phrase ->
-            val normalized = phrase.lowercase()
-                .replace(Regex("[^\\p{L}\\p{N}\\s]"), " ")
-                .replace(Regex("\\s+"), " ")
-                .trim()
-            wakePhrases.any { wake ->
-                normalized == wake || normalized.startsWith("$wake ")
-            } || normalized == "myra" || normalized == "mira" || normalized == "मायरा"
+    private fun stopListening() {
+        shouldListen.set(false)
+        audioRecord?.let { recorder ->
+            runCatching {
+                if (recorder.recordingState == AudioRecord.RECORDSTATE_RECORDING) recorder.stop()
+            }
         }
-        val now = System.currentTimeMillis()
-        if (!matched || now - lastWakeTriggerAtMs < WAKE_TRIGGER_COOLDOWN_MS) return false
+    }
 
-        lastWakeTriggerAtMs = now
-        isListeningLoopActive = false
-        mainHandler.removeCallbacksAndMessages(null)
-        runCatching { speechRecognizer?.cancel() }
-        _statusNote.value = "Wake phrase detected — tap the MYRA notification if the app did not open."
+    private fun onWakePhraseDetected() {
+        _statusNote.value = "HEY MYRA detected. Opening the assistant; microphone capture has been released."
+        updateNotification("HEY MYRA detected — opening MYRA.")
         val launch = Intent(this, MainActivity::class.java).apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
             putExtra(EXTRA_WAKE_TRIGGERED, true)
         }
-        updateNotification("Wake phrase heard — tap the MYRA alert to open.")
         getSystemService(NotificationManager::class.java).notify(
             WAKE_ALERT_NOTIF_ID,
             buildWakeAlertNotification(launch),
         )
+        // Android may block background Activity launches on some versions/OEM builds.
+        // The high-priority notification remains the reliable user-visible fallback.
         runCatching { startActivity(launch) }
-        return true
-    }
-
-    private fun scheduleRestart(delayMs: Long) {
-        if (!isListeningLoopActive) return
-        mainHandler.removeCallbacksAndMessages(null)
-        recognitionLanguage = nextWakeRecognitionLanguage(recognitionLanguage)
-        mainHandler.postDelayed({ initAndStartRecognizer() }, delayMs)
     }
 
     override fun onDestroy() {
+        stopListening()
         isRunning = false
-        isListeningLoopActive = false
-        mainHandler.removeCallbacksAndMessages(null)
-        runCatching { speechRecognizer?.destroy() }
-        speechRecognizer = null
         _statusNote.value = "Stopped"
+        mainHandler.removeCallbacksAndMessages(null)
         super.onDestroy()
     }
 
     private fun createNotificationChannel() {
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            getString(R.string.channel_wake_name),
-            NotificationManager.IMPORTANCE_LOW,
-        )
         val manager = getSystemService(NotificationManager::class.java)
-        manager.createNotificationChannel(channel)
+        manager.createNotificationChannel(
+            NotificationChannel(
+                CHANNEL_ID,
+                getString(R.string.channel_wake_name),
+                NotificationManager.IMPORTANCE_LOW,
+            ),
+        )
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val wakeAlertChannel = NotificationChannel(
-                WAKE_ALERT_CHANNEL_ID,
-                "MYRA Wake Phrase Alerts",
-                NotificationManager.IMPORTANCE_HIGH,
-            ).apply {
-                description = "Visible alert when Hey MYRA is detected."
-                lockscreenVisibility = Notification.VISIBILITY_PRIVATE
-            }
-            manager.createNotificationChannel(wakeAlertChannel)
+            manager.createNotificationChannel(
+                NotificationChannel(
+                    WAKE_ALERT_CHANNEL_ID,
+                    "MYRA Wake Phrase Alerts",
+                    NotificationManager.IMPORTANCE_HIGH,
+                ).apply {
+                    description = "Visible alert when the offline Hey MYRA phrase is detected."
+                    lockscreenVisibility = Notification.VISIBILITY_PRIVATE
+                },
+            )
         }
     }
 
@@ -265,7 +265,7 @@ class WakeWordService : Service() {
         return NotificationCompat.Builder(this, WAKE_ALERT_CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_myra_notif)
             .setContentTitle("Hey MYRA detected")
-            .setContentText("Tap to start MYRA voice assistant.")
+            .setContentText("Tap to start MYRA if Android did not open it automatically.")
             .setCategory(NotificationCompat.CATEGORY_RECOMMENDATION)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
@@ -276,13 +276,14 @@ class WakeWordService : Service() {
 
     private fun updateNotification(contentText: String) {
         if (!isRunning) return
-        getSystemService(NotificationManager::class.java).notify(NOTIF_ID, buildNotification(contentText))
+        getSystemService(NotificationManager::class.java)
+            .notify(NOTIF_ID, buildNotification(contentText))
     }
 
     private fun buildNotification(
-        contentText: String = "Listening via OS SpeechRecognizer for 'Hey MYRA'",
-        launchIntent: Intent = Intent(this, MainActivity::class.java),
+        contentText: String = "Offline wake-word listening for Hey MYRA",
     ): Notification {
+        val launchIntent = Intent(this, MainActivity::class.java)
         val openIntent = PendingIntent.getActivity(
             this,
             0,
@@ -292,12 +293,12 @@ class WakeWordService : Service() {
         val stopIntent = PendingIntent.getService(
             this,
             1,
-            Intent(this, WakeWordService::class.java).apply { action = ACTION_STOP },
-            PendingIntent.FLAG_IMMUTABLE,
+            Intent(this, WakeWordService::class.java).setAction(ACTION_STOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_myra_notif)
-            .setContentTitle("MYRA Voice Trigger (Foreground)")
+            .setContentTitle("MYRA Offline Wake Word")
             .setContentText(contentText)
             .setContentIntent(openIntent)
             .addAction(0, "Stop", stopIntent)
@@ -306,6 +307,14 @@ class WakeWordService : Service() {
     }
 
     companion object {
+        private const val MODEL_TYPE = 1 // GigaSpeech English KWS model
+        private const val MODEL_DIR = "sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01"
+        private const val KEYWORDS_FILE = "$MODEL_DIR/keywords.txt"
+        private const val SAMPLE_RATE = 16_000
+        private const val FEATURE_DIM = 80
+        private const val CHUNK_SAMPLES = 1_600
+        private const val WAKE_TRIGGER_COOLDOWN_MS = 4_000L
+
         const val CHANNEL_ID = "myra_wake_word_channel"
         const val NOTIF_ID = 2003
         private const val WAKE_ALERT_NOTIF_ID = 2004
@@ -313,18 +322,19 @@ class WakeWordService : Service() {
         const val ACTION_STOP = "com.myra.STOP_WAKE_WORD"
         const val ACTION_PAUSE = "com.myra.PAUSE_WAKE_WORD"
         const val ACTION_RESUME = "com.myra.RESUME_WAKE_WORD"
-        private const val WAKE_TRIGGER_COOLDOWN_MS = 4_000L
         const val EXTRA_WAKE_TRIGGERED = "WAKE_TRIGGERED"
 
         @Volatile
         var isRunning: Boolean = false
             private set
 
-        private val _statusNote = MutableStateFlow("Inactive (Offline hotword model not bundled)")
-        val statusNote: StateFlow<String> = _statusNote.asStateFlow()
+        private val _statusNote = kotlinx.coroutines.flow.MutableStateFlow(
+            "Inactive (offline HEY MYRA model is loaded by the app build)",
+        )
+        val statusNote: kotlinx.coroutines.flow.StateFlow<String> = _statusNote.asStateFlow()
     }
 }
 
-/** Alternates recognizer locale so Hindi and English wake phrases both get listening turns. */
+/** Retained for compatibility with diagnostics/tests that used the earlier locale helper. */
 internal fun nextWakeRecognitionLanguage(current: String): String =
     if (current == "en-IN") "hi-IN" else "en-IN"
