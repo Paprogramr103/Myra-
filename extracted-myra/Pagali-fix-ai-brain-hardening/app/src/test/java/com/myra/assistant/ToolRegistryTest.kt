@@ -66,6 +66,30 @@ class ToolRegistryTest {
     }
 
     @Test
+    fun `validates reminder delay and maps reminder command`() {
+        assertNotNull(ToolRegistry.validationError("set_reminder", JSONObject()))
+        assertNotNull(
+            ToolRegistry.validationError(
+                "set_reminder",
+                JSONObject().put("title", "Call Papa").put("delay_minutes", "0"),
+            ),
+        )
+        assertNotNull(
+            ToolRegistry.validationError(
+                "set_reminder",
+                JSONObject().put("title", "Call Papa").put("delay_minutes", "10081"),
+            ),
+        )
+        val reminder = ToolRegistry.toAppCommand(
+            "set_reminder",
+            JSONObject().put("title", "Call Papa").put("delay_minutes", "30"),
+        )
+        assertEquals(AppCommand.SET_REMINDER, reminder?.type)
+        assertEquals("Call Papa", reminder?.params?.get("title"))
+        assertEquals("30", reminder?.params?.get("delay_minutes"))
+    }
+
+    @Test
     fun `maps valid arguments and requires exact WhatsApp message content`() {
         val youtube = ToolRegistry.toAppCommand(
             "search_play_youtube",
