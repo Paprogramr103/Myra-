@@ -125,8 +125,10 @@ class WakeWordService : Service() {
                 keywordsThreshold = 0.25f,
                 numTrailingBlanks = 2,
             )
-            spotter = KeywordSpotter(assetManager = assets, config = config)
-            stream = spotter.createStream()
+            val activeSpotter = KeywordSpotter(assetManager = assets, config = config)
+            spotter = activeSpotter
+            val activeStream = activeSpotter.createStream()
+            stream = activeStream
 
             val minimumBuffer = AudioRecord.getMinBufferSize(
                 SAMPLE_RATE,
@@ -160,10 +162,10 @@ class WakeWordService : Service() {
                 if (count <= 0) continue
 
                 val samples = FloatArray(count) { index -> pcm[index] / 32768.0f }
-                stream.acceptWaveform(samples, sampleRate = SAMPLE_RATE)
-                while (spotter.isReady(stream)) {
-                    spotter.decode(stream)
-                    val keyword = spotter.getResult(stream).keyword
+                activeStream.acceptWaveform(samples, sampleRate = SAMPLE_RATE)
+                while (activeSpotter.isReady(activeStream)) {
+                    activeSpotter.decode(activeStream)
+                    val keyword = activeSpotter.getResult(activeStream).keyword
                     if (keyword.isNotBlank()) {
                         val now = System.currentTimeMillis()
                         if (now - lastWakeTriggerAtMs >= WAKE_TRIGGER_COOLDOWN_MS) {
@@ -172,7 +174,7 @@ class WakeWordService : Service() {
                             shouldListen.set(false)
                             break
                         }
-                        spotter.reset(stream)
+                        activeSpotter.reset(activeStream)
                     }
                 }
                 if (detected) break
