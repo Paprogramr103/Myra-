@@ -16,6 +16,7 @@ import android.os.Build
 import android.os.IBinder
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.myra.assistant.R
@@ -40,6 +41,7 @@ class WakeWordService : Service() {
     private val shouldListen = AtomicBoolean(false)
     @Volatile private var audioRecord: AudioRecord? = null
     @Volatile private var workerThread: Thread? = null
+    @Volatile private var cpuWakeLock: PowerManager.WakeLock? = null
     private var lastWakeTriggerAtMs = 0L
 
     override fun onBind(intent: Intent?): IBinder? = null
@@ -104,6 +106,7 @@ class WakeWordService : Service() {
             mainHandler.postDelayed({ startKeywordSpotting() }, 350L)
             return
         }
+        acquireCpuWakeLock()
         shouldListen.set(true)
         _statusNote.value = "Loading offline Hindi MYRA model..."
         updateNotification("Loading offline Hindi wake-word model...")
@@ -201,6 +204,7 @@ class WakeWordService : Service() {
                 runCatching { recorder.release() }
             }
             audioRecord = null
+            releaseCpuWakeLock()
             workerThread = null
         }
 
@@ -250,6 +254,26 @@ class WakeWordService : Service() {
         return hasName && hasCallWord
     }
 
+    private fun acquireCpuWakeLock() {
+        val powerManager = getSystemService(PowerManager::class.java)
+        if (cpuWakeLock?.isHeld != true) {
+            cpuWakeLock = powerManager.newWakeLock(
+                PowerManager.PARTIAL_WAKE_LOCK,
+                "MYRA:OfflineWakeWord",
+            ).apply {
+                setReferenceCounted(false)
+                acquire()
+            }
+        }
+    }
+
+    private fun releaseCpuWakeLock() {
+        cpuWakeLock?.let { lock ->
+            if (lock.isHeld) runCatching { lock.release() }
+        }
+        cpuWakeLock = null
+    }
+
     private fun stopListening() {
         shouldListen.set(false)
         audioRecord?.let { recorder ->
@@ -277,6 +301,7 @@ class WakeWordService : Service() {
 
     override fun onDestroy() {
         stopListening()
+        releaseCpuWakeLock()
         isRunning = false
         _statusNote.value = "Stopped"
         mainHandler.removeCallbacksAndMessages(null)
