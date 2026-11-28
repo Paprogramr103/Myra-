@@ -24,6 +24,7 @@ import com.myra.assistant.data.preferences.SecureSettingsRepository
 import com.myra.assistant.data.repository.MyraRepository
 import com.myra.assistant.model.AppCommand
 import com.myra.assistant.service.AccessibilityHelperService
+import com.myra.assistant.service.ReminderScheduler
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -101,6 +102,21 @@ class AndroidToolsExecutor(
                 message = "Opening Camera & Barcode Scanner.",
                 navigateRoute = "scanner",
             )
+            AppCommand.SET_REMINDER -> {
+                val title = command.params["title"].orEmpty()
+                val minutes = command.params["delay_minutes"]?.toIntOrNull() ?: 0
+                val scheduled = ReminderScheduler.schedule(context, title, minutes)
+                if (!scheduled) ToolExecutionResult(false, "रिमाइंडर सेट नहीं हो सका। समय 1 मिनट से 7 दिन के बीच होना चाहिए।")
+                else {
+                    val permissionGranted = Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+                        ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                    ToolExecutionResult(
+                        true,
+                        if (permissionGranted) "रिमाइंडर सेट हो गया: $title। लगभग $minutes मिनट बाद सूचना मिलेगी। Android बैटरी प्रबंधन के कारण कुछ देरी हो सकती है।"
+                        else "रिमाइंडर समय पर सेट हो गया: $title। सूचना देखने के लिए MYRA की Notifications permission चालू करें।",
+                    )
+                }
+            }
             AppCommand.DEVICE_STATUS -> {
                 val status = telemetry.readSystemStatus(torchEnabled)
                 ToolExecutionResult(
