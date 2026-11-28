@@ -101,7 +101,11 @@ class WakeWordService : Service() {
     }
 
     private fun startKeywordSpotting() {
-        if (shouldListen.get() || workerThread?.isAlive == true) return
+        if (shouldListen.get()) return
+        if (workerThread?.isAlive == true) {
+            mainHandler.postDelayed({ startKeywordSpotting() }, 350L)
+            return
+        }
         shouldListen.set(true)
         _statusNote.value = "Loading offline HEY MYRA model..."
         updateNotification("Loading offline wake-word model...")
