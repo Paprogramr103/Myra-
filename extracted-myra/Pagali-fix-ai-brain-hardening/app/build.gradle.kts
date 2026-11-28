@@ -118,11 +118,9 @@ dependencies {
   implementation(libs.play.services.location)
   // implementation(libs.retrofit)
   implementation(libs.zxing.core)
-  // Offline keyword spotting engine; Android native libraries are supplied by the official artifact.
-  implementation("com.github.k2-fsa:sherpa-onnx:v1.13.5") {
-    // The Android AAR already bundles the Kotlin API classes; avoid the duplicate JVM artifact.
-    exclude(group = "com.github.k2-fsa.sherpa-onnx", module = "sherpa-onnx-jvm")
-  }
+  // Offline Hindi speech recognition for native wake phrase matching.
+  implementation("net.java.dev.jna:jna:5.18.1@aar")
+  implementation("com.alphacephei:vosk-android:0.3.75@aar")
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)
