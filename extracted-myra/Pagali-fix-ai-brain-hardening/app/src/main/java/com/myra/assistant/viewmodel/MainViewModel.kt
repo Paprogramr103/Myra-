@@ -1082,7 +1082,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         }
         val intent = Intent(app, WakeWordService::class.java)
         if (enable) {
-            intent.action = WakeWordService.ACTION_PAUSE
+            // Enabling wake word must start offline listening, not pause it.
+            intent.action = WakeWordService.ACTION_RESUME
             runCatching { app.startForegroundService(intent) }
                 .onSuccess { settingsRepo.setWakeWordEnabled(true) }
                 .onFailure {
