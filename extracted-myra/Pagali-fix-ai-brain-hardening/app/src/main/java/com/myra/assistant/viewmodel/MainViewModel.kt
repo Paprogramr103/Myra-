@@ -165,7 +165,12 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             )
             return
         }
-        if (geminiLive?.isConnected() != true && _uiState.value.connectionState != ConnectionState.CONNECTING) {
+        // Activity recreation / returning from Settings must not replace a
+        // healthy socket or interrupt an automatic retry already in progress.
+        if (geminiLive?.hasActiveConnectionAttempt() != true &&
+            _uiState.value.connectionState != ConnectionState.CONNECTING &&
+            _uiState.value.connectionState != ConnectionState.RECONNECTING
+        ) {
             connectLiveSession()
         }
     }
@@ -294,7 +299,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun connectLiveSession() {
-        // A repeated screen/settings callback must not tear down a healthy Live socket.
+        // Idempotent guard covers both a healthy socket and an unfinished setup
+        // handshake / scheduled automatic retry.
         if (geminiLive?.isConnected() == true) {
             _uiState.value = _uiState.value.copy(
                 connectionState = ConnectionState.CONNECTED,
@@ -303,7 +309,8 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         if (_uiState.value.connectionState == ConnectionState.CONNECTING ||
-            _uiState.value.connectionState == ConnectionState.RECONNECTING
+            _uiState.value.connectionState == ConnectionState.RECONNECTING ||
+            geminiLive?.hasActiveConnectionAttempt() == true
         ) return
 
         if (geminiLive == null) setupAudioAndGemini()
