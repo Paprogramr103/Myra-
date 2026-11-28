@@ -57,7 +57,7 @@ jobs:
           curl --fail --location --retry 4 --retry-all-errors "${MODEL_URL}" --output /tmp/myra-kws-model.tar.bz2
           tar -xjf /tmp/myra-kws-model.tar.bz2 -C app/src/main/assets
           python -m pip install --disable-pip-version-check "sherpa-onnx==1.13.5" "sentencepiece" "click" "pypinyin"
-          printf 'HEY MYRA\\nHI MYRA\\nHELLO MYRA\\nOKAY MYRA\\n' > "app/src/main/assets/${MODEL_NAME}/keywords_raw.txt"
+          printf 'HEY MYRA\nHI MYRA\nHELLO MYRA\nOKAY MYRA\n' > "app/src/main/assets/${MODEL_NAME}/keywords_raw.txt"
           sherpa-onnx-cli text2token \
             --tokens "app/src/main/assets/${MODEL_NAME}/tokens.txt" \
             --tokens-type bpe \
