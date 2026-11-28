@@ -32,16 +32,19 @@ class WebResearchService {
         val url = HttpUrl.Builder().scheme("https").host("html.duckduckgo.com").addPathSegment("html")
             .addQueryParameter("q", query).build()
         val html = get(url.toString()) ?: return Result(false, "अभी इंटरनेट सर्च सेवा से जवाब नहीं मिला। नेटवर्क जाँचकर फिर कोशिश करें।")
-        val blockRegex = Regex("""(?is)<div[^>]*class=["'][^"']*result[^"']*["'][^>]*>(.*?)</div>\s*</div>""")
-        val blocks = blockRegex.findAll(html).map { it.value }.toList()
-        val results = if (blocks.isNotEmpty()) blocks.mapNotNull { block ->
-            val anchor = Regex("""(?is)<a[^>]*class=["'][^"']*result__a[^"']*["'][^>]*href=["']([^"']+)["'][^>]*>(.*?)</a>""").find(block)
-            val href = anchor?.groupValues?.get(1)?.let(::resolveDuckDuckGoUrl)
-            val title = anchor?.groupValues?.get(2)?.let(::cleanHtml)
+        val anchors = Regex("""(?is)<a\\b(?=[^>]*class=["'][^"']*result__a)([^>]*)>(.*?)</a>""")
+            .findAll(html).toList()
+        val results = anchors.mapIndexedNotNull { index, match ->
+            val attributes = match.groupValues[1]
+            val rawHref = Regex("""(?is)href=["']([^"']+)["']""").find(attributes)?.groupValues?.get(1)
+            val href = rawHref?.let(::resolveDuckDuckGoUrl)
+            val title = cleanHtml(match.groupValues[2])
+            val segmentEnd = anchors.getOrNull(index + 1)?.range?.first ?: html.length
+            val segment = html.substring(match.range.last + 1, segmentEnd.coerceAtMost(html.length))
             val snippet = Regex("""(?is)class=["'][^"']*result__snippet[^"']*["'][^>]*>(.*?)</(?:a|div|td)>""")
-                .find(block)?.groupValues?.get(1)?.let(::cleanHtml).orEmpty()
-            if (!href.isNullOrBlank() && !title.isNullOrBlank() && href.startsWith("http")) Triple(title, snippet, href) else null
-        }.distinctBy { it.third }.take(5) else emptyList()
+                .find(segment)?.groupValues?.get(1)?.let(::cleanHtml).orEmpty()
+            if (!href.isNullOrBlank() && title.isNotBlank() && href.startsWith("http")) Triple(title, snippet, href) else null
+        }.distinctBy { it.third }.take(5)
         if (results.isEmpty()) return Result(false, "“$query” के लिए भरोसेमंद खोज परिणाम नहीं मिले। थोड़ा अलग शब्दों में पूछें।")
         val text = buildString {
             append("इंटरनेट पर “").append(query).append("” के खोज परिणाम मिले। नीचे स्रोत लिंक हैं; जानकारी खोलकर तारीख और स्रोत जाँचें।")
