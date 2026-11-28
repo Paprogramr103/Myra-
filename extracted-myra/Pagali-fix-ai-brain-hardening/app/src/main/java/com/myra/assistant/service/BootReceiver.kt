@@ -12,6 +12,7 @@ import com.myra.assistant.data.preferences.SecureSettingsRepository
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent?) {
         if (intent?.action != Intent.ACTION_BOOT_COMPLETED) return
+        ReminderScheduler.restore(context)
         val prefs = SecureSettingsRepository(context).settings.value
 
         if (prefs.callMonitorEnabled) {
