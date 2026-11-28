@@ -153,6 +153,11 @@ object ToolRegistry {
             commandType = AppCommand.SCAN_BARCODE,
         ),
         ToolDefinition(
+            name = "send_sos_alert",
+            description = "Prepare an emergency SOS SMS draft for the user's first saved MYRA Prime Contact. Only invoke when the user explicitly asks for SOS/emergency help. Include a current Google Maps location link only if a fresh device location is available with permission. Never claim an SMS was sent: open the system SMS composer and require the user to review and tap Send. If no Prime Contact is saved, explain that one must be added in MYRA Settings first.",
+            commandType = AppCommand.SEND_SOS_ALERT,
+        ),
+        ToolDefinition(
             name = "set_reminder",
             description = "Set a one-time reminder on this device. Use a concise reminder title and delay_minutes from 1 to 10080 (seven days). The reminder is scheduled locally and restored after reboot. Do not claim it is exact to the second; Android may defer background alarms.",
             commandType = AppCommand.SET_REMINDER,
