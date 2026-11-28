@@ -33,7 +33,7 @@ import kotlinx.coroutines.flow.asStateFlow
 /**
  * Permission-based offline wake-word foreground service.
  *
- * The English GigaSpeech KWS model and the custom HEY MYRA keyword file are packaged
+ * The English-trained GigaSpeech KWS model and custom English/phonetic Hindi keyword aliases are packaged
  * into the CI-built APK. This service owns the microphone only while the app is in
  * the background. MainActivity pauses this service before Gemini Live takes the mic.
  */
@@ -155,8 +155,8 @@ class WakeWordService : Service() {
             }
             audioRecord = recorder
             recorder.startRecording()
-            _statusNote.value = "Offline wake-word listening active — say Hey MYRA."
-            updateNotification("Offline listening active for “Hey MYRA”.")
+            _statusNote.value = "Offline wake-word listening active — say Hey MYRA or SUNO MYRA."
+            updateNotification("Offline listening active for Hey MYRA / SUNO MYRA aliases.")
 
             val pcm = ShortArray(CHUNK_SAMPLES)
             while (shouldListen.get()) {
@@ -288,7 +288,7 @@ class WakeWordService : Service() {
     }
 
     private fun buildNotification(
-        contentText: String = "Offline wake-word listening for Hey MYRA",
+        contentText: String = "Offline wake-word listening for Hey MYRA / SUNO MYRA",
     ): Notification {
         val launchIntent = Intent(this, MainActivity::class.java)
         val openIntent = PendingIntent.getActivity(
