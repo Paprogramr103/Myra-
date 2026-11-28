@@ -153,6 +153,16 @@ object ToolRegistry {
             commandType = AppCommand.SCAN_BARCODE,
         ),
         ToolDefinition(
+            name = "set_reminder",
+            description = "Set a one-time reminder on this device. Use a concise reminder title and delay_minutes from 1 to 10080 (seven days). The reminder is scheduled locally and restored after reboot. Do not claim it is exact to the second; Android may defer background alarms.",
+            commandType = AppCommand.SET_REMINDER,
+            parameters = mapOf(
+                "title" to ("STRING" to "What the user wants to be reminded about"),
+                "delay_minutes" to ("STRING" to "Number of minutes from now, between 1 and 10080"),
+            ),
+            requiredParams = listOf("title", "delay_minutes"),
+        ),
+        ToolDefinition(
             name = "get_device_status",
             description = "Get battery percentage, RAM usage, and current time.",
             commandType = AppCommand.DEVICE_STATUS,
@@ -245,6 +255,9 @@ object ToolRegistry {
             ) {
                 return "Argument 'index' must be a non-negative integer string."
             }
+            "set_reminder" -> if (args.optString("delay_minutes").toIntOrNull()?.let { it in 1..10080 } != true) {
+                return "Argument 'delay_minutes' must be between 1 and 10080."
+            }
         }
         return null
     }
@@ -272,6 +285,7 @@ object ToolRegistry {
             "find_parking_spot" -> AppCommand(AppCommand.FIND_PARKING)
             "open_camera_vision" -> AppCommand(AppCommand.CAMERA_VISION)
             "open_barcode_scanner" -> AppCommand(AppCommand.SCAN_BARCODE)
+            "set_reminder" -> AppCommand(AppCommand.SET_REMINDER, mapOf("title" to args.getString("title"), "delay_minutes" to args.getString("delay_minutes")))
             "get_device_status" -> AppCommand(AppCommand.DEVICE_STATUS)
             "send_to_pc_companion" -> AppCommand(AppCommand.SEND_TO_PC, mapOf("payload" to args.getString("payload")))
             else -> null
