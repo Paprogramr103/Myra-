@@ -90,6 +90,13 @@ class ToolRegistryTest {
     }
 
     @Test
+    fun `exposes SOS alert as a no-argument explicit action`() {
+        assertNull(ToolRegistry.validationError("send_sos_alert", JSONObject()))
+        val command = ToolRegistry.toAppCommand("send_sos_alert", JSONObject())
+        assertEquals(AppCommand.SEND_SOS_ALERT, command?.type)
+    }
+
+    @Test
     fun `maps valid arguments and requires exact WhatsApp message content`() {
         val youtube = ToolRegistry.toAppCommand(
             "search_play_youtube",
