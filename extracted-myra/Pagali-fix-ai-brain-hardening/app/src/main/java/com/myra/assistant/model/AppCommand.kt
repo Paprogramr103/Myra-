@@ -36,6 +36,7 @@ data class AppCommand(
         const val CAMERA_VISION = "CAMERA_VISION"
         const val DEVICE_STATUS = "DEVICE_STATUS"
         const val SET_REMINDER = "SET_REMINDER"
+        const val SEND_SOS_ALERT = "SEND_SOS_ALERT"
         const val SEND_TO_PC = "SEND_TO_PC"
     }
 }
