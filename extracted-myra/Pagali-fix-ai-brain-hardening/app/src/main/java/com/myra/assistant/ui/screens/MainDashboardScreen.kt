@@ -3,6 +3,8 @@ package com.myra.assistant.ui.screens
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.widget.Toast
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
@@ -41,6 +43,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.ClickableText
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -90,9 +93,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -700,11 +708,46 @@ private fun ChatHistoryList(
                             ),
                         ),
                 ) {
-                    Text(
-                        text = msg.text,
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MyraTextPrimary,
+                    val context = LocalContext.current
+                    val linkPattern = remember { Regex("""https?://[^\\s<>"']+""", RegexOption.IGNORE_CASE) }
+                    val annotatedMessage = remember(msg.text) {
+                        buildAnnotatedString {
+                            var cursor = 0
+                            linkPattern.findAll(msg.text).forEach { match ->
+                                val rawUrl = match.value
+                                val url = rawUrl.trimEnd('.', ',', ';', ':', '!', '?', ')', ']', '}')
+                                val trailing = rawUrl.substring(url.length)
+                                if (url.isNotBlank()) {
+                                    append(msg.text.substring(cursor, match.range.first))
+                                    pushStringAnnotation(tag = "MYRA_URL", annotation = url)
+                                    withStyle(SpanStyle(color = MyraCyan, textDecoration = TextDecoration.Underline)) {
+                                        append(url)
+                                    }
+                                    pop()
+                                    append(trailing)
+                                    cursor = match.range.last + 1
+                                }
+                            }
+                            append(msg.text.substring(cursor))
+                        }
+                    }
+                    ClickableText(
+                        text = annotatedMessage,
+                        style = MaterialTheme.typography.bodyLarge.copy(color = MyraTextPrimary),
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp),
+                        onClick = { offset ->
+                            annotatedMessage.getStringAnnotations("MYRA_URL", offset, offset)
+                                .firstOrNull()?.item?.let { url ->
+                                    runCatching {
+                                        context.startActivity(
+                                            Intent(Intent.ACTION_VIEW, Uri.parse(url))
+                                                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
+                                        )
+                                    }.onFailure {
+                                        Toast.makeText(context, "लिंक नहीं खुल पाया: $url", Toast.LENGTH_LONG).show()
+                                    }
+                                }
+                        },
                     )
                 }
             }
