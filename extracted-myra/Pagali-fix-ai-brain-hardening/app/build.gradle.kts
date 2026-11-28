@@ -118,6 +118,8 @@ dependencies {
   implementation(libs.play.services.location)
   // implementation(libs.retrofit)
   implementation(libs.zxing.core)
+  // Offline keyword spotting engine; Android native libraries are supplied by the official artifact.
+  implementation("com.github.k2-fsa:sherpa-onnx:v1.13.5")
   testImplementation(libs.androidx.compose.ui.test.junit4)
   testImplementation(libs.androidx.core)
   testImplementation(libs.androidx.junit)
