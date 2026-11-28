@@ -47,6 +47,7 @@ class AndroidToolsExecutor(
     private val telemetry: DeviceTelemetryHelper,
 ) {
     private var torchEnabled = false
+    private val webResearch = WebResearchService()
 
     suspend fun execute(command: AppCommand): ToolExecutionResult = withContext(Dispatchers.IO) {
         when (command.type) {
@@ -85,6 +86,9 @@ class AndroidToolsExecutor(
             AppCommand.BLUETOOTH_SETTINGS -> openBluetoothSettings()
             AppCommand.NAVIGATE_MAPS -> navigateMaps(command.params["destination"].orEmpty())
             AppCommand.GET_CURRENT_LOCATION -> getCurrentLocationForUser()
+            AppCommand.WEB_SEARCH -> webResearch.search(command.params["query"].orEmpty()).toToolExecutionResult()
+            AppCommand.GET_WEATHER -> webResearch.weather(command.params["location"].orEmpty()).toToolExecutionResult()
+            AppCommand.GET_LATEST_NEWS -> webResearch.news(command.params["topic"].orEmpty()).toToolExecutionResult()
             AppCommand.SAVE_PARKING -> saveParkingSpot(command.params["note"].orEmpty())
             AppCommand.FIND_PARKING -> findParkingSpot()
             AppCommand.CAMERA_VISION -> ToolExecutionResult(
@@ -119,6 +123,10 @@ class AndroidToolsExecutor(
             else -> ToolExecutionResult(false, "Unsupported command: ${command.type}")
         }
     }
+
+
+    private fun WebResearchService.Result.toToolExecutionResult(): ToolExecutionResult =
+        ToolExecutionResult(success = success, message = message)
 
     private suspend fun searchYouTube(rawQuery: String): ToolExecutionResult {
         val query = rawQuery.trim()
