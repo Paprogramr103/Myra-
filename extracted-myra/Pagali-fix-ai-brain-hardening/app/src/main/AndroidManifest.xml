@@ -185,6 +185,12 @@
             android:name=".service.PowerButtonReceiver"
             android:exported="false" />
 
+        <!-- Local reminder alarm receiver -->
+        <receiver
+            android:name=".service.ReminderAlarmReceiver"
+            android:enabled="true"
+            android:exported="false" />
+
         <!-- Boot Receiver -->
         <receiver
             android:name=".service.BootReceiver"
