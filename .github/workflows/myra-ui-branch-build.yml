@@ -31,6 +31,11 @@ jobs:
           cache: gradle
           cache-dependency-path: extracted-myra/Pagali-fix-ai-brain-hardening/**/*.gradle*
 
+      - name: Set up Python for wake-word keyword generation
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
       - name: Install Android SDK
         shell: bash
         run: |
@@ -51,7 +56,7 @@ jobs:
           mkdir -p app/src/main/assets
           curl --fail --location --retry 4 --retry-all-errors "${MODEL_URL}" --output /tmp/myra-kws-model.tar.bz2
           tar -xjf /tmp/myra-kws-model.tar.bz2 -C app/src/main/assets
-          python3 -m pip install --disable-pip-version-check "sherpa-onnx==1.13.5"
+          python -m pip install --disable-pip-version-check "sherpa-onnx==1.13.5" "sentencepiece"
           printf 'HEY MYRA\\nHI MYRA\\nHELLO MYRA\\nOKAY MYRA\\n' > "app/src/main/assets/${MODEL_NAME}/keywords_raw.txt"
           sherpa-onnx-cli text2token \
             --tokens "app/src/main/assets/${MODEL_NAME}/tokens.txt" \
