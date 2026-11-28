@@ -67,7 +67,22 @@ class GeminiLiveClient(
 
     fun isConnected(): Boolean = webSocket != null && isSetupComplete.get()
 
+    /**
+     * True while a socket is established, its setup handshake is pending, a
+     * connection attempt is opening, or the automatic retry is already queued.
+     * Lifecycle callbacks must not start a second connection in any of these states.
+     */
+    fun hasActiveConnectionAttempt(): Boolean =
+        isConnected() ||
+            isConnecting.get() ||
+            webSocket != null ||
+            (reconnectTask?.isDone == false)
+
     fun connect() {
+        if (hasActiveConnectionAttempt()) {
+            onLog?.invoke("DEBUG", "Ignoring duplicate connect request; Live session is already active or pending.")
+            return
+        }
         val settings = settingsProvider()
         val credentialFingerprint = if (settings.connectionMode == ConnectionMode.DIRECT_USER_KEY) {
             "${settings.apiKey.length}:${settings.apiKey.hashCode()}"
