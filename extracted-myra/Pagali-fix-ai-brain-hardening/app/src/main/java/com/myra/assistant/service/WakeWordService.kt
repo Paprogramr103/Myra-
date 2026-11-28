@@ -28,6 +28,7 @@ import com.myra.assistant.ui.main.MainActivity
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.concurrent.thread
 import kotlin.math.max
+import kotlinx.coroutines.flow.asStateFlow
 
 /**
  * Permission-based offline wake-word foreground service.
