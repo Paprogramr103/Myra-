@@ -486,6 +486,11 @@ fun SettingsScreen(
                             }
                         }
                         Spacer(Modifier.height(6.dp))
+                        Text(
+                            "SOS emergency alert uses the first contact below. MYRA prepares an SMS with your available location; review it and tap Send yourself.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MyraTextSecondary,
+                        )
                         if (settings.primeContacts.isEmpty()) {
                             Text(
                                 "No Prime Contacts added yet. Say 'close friend ko call karo' once added.",
