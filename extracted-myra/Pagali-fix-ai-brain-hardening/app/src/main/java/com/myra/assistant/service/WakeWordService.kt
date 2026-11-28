@@ -30,8 +30,8 @@ import kotlinx.coroutines.flow.asStateFlow
 /**
  * Permission-based offline wake-word foreground service.
  *
- * The English-trained GigaSpeech KWS model and custom English/phonetic Hindi keyword aliases are packaged
- * into the CI-built APK. This service owns the microphone only while the app is in
+ * A Hindi Vosk acoustic model is packaged into the CI-built APK and used for
+ * offline Hindi phrase recognition. This service owns the microphone only while the app is in
  * the background. MainActivity pauses this service before Gemini Live takes the mic.
  */
 class WakeWordService : Service() {
@@ -360,7 +360,6 @@ class WakeWordService : Service() {
     companion object {
         private const val MODEL_ASSET_DIR = "vosk-model-small-hi-0.22"
         private const val SAMPLE_RATE = 16_000
-        private const val FEATURE_DIM = 80
         private const val CHUNK_SAMPLES = 1_600
         private const val WAKE_TRIGGER_COOLDOWN_MS = 4_000L
 
