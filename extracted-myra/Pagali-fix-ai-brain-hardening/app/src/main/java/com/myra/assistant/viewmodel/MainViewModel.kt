@@ -294,6 +294,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun connectLiveSession() {
+        // A repeated screen/settings callback must not tear down a healthy Live socket.
+        if (geminiLive?.isConnected() == true) {
+            _uiState.value = _uiState.value.copy(
+                connectionState = ConnectionState.CONNECTED,
+                connectionMessage = "Connected (Live Voice)",
+            )
+            return
+        }
+        if (_uiState.value.connectionState == ConnectionState.CONNECTING ||
+            _uiState.value.connectionState == ConnectionState.RECONNECTING
+        ) return
+
         if (geminiLive == null) setupAudioAndGemini()
         audioEngine?.resumeAudio()
         hasSentGreetingThisSession = false
@@ -983,6 +995,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
         personality: PersonalityMode,
         pcPort: Int,
     ) {
+        val previous = settingsRepo.settings.value
+        val wasLiveActive = geminiLive?.isConnected() == true ||
+            _uiState.value.connectionState == ConnectionState.CONNECTING ||
+            _uiState.value.connectionState == ConnectionState.RECONNECTING
+        val liveConfigurationChanged =
+            previous.connectionMode != connectionMode ||
+            previous.apiKey != apiKey ||
+            previous.proxyUrl != proxyUrl ||
+            previous.proxyAuthToken != proxyAuthToken ||
+            previous.model != model ||
+            previous.voice != voice ||
+            previous.personality != personality ||
+            previous.userName != userName
         val credentialsProvided = apiKey.isNotBlank() || proxyAuthToken.isNotBlank()
         settingsRepo.saveSettings(
             connectionMode = connectionMode,
@@ -1010,8 +1035,18 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
                 "Saved mode=${connectionMode.key}, model=${model.modelId}, voice=${voice.voiceId}, personality=${personality.key}",
             )
         }
-        _toastMessages.tryEmit("Settings saved — reconnecting MYRA...")
-        reconnectWithNewSettings()
+        when {
+            liveConfigurationChanged && wasLiveActive -> {
+                _toastMessages.tryEmit("Live settings changed — reconnecting MYRA once...")
+                reconnectWithNewSettings()
+            }
+            liveConfigurationChanged -> {
+                _toastMessages.tryEmit("Settings saved. Connect MYRA when you're ready.")
+            }
+            else -> {
+                _toastMessages.tryEmit("Settings saved — current Gemini connection kept.")
+            }
+        }
     }
 
     fun clearStoredCredentials() {
