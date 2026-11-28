@@ -223,7 +223,7 @@ object ToolRegistry {
             if (!args.has(key) || args.isNull(key)) return@forEach
             val value = args.opt(key)
             when (typeAndDescription.first) {
-                "STRING" -> if (value !is String || value.isBlank()) {
+                "STRING" -> if (value !is String || (value.isBlank() && !(functionName == "get_latest_news" && key == "topic"))) {
                     return "Argument '$key' must be a non-empty string."
                 }
                 "BOOLEAN" -> if (value !is Boolean) {
