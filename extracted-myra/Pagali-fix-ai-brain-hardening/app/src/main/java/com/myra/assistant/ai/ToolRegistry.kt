@@ -290,6 +290,7 @@ object ToolRegistry {
             "find_parking_spot" -> AppCommand(AppCommand.FIND_PARKING)
             "open_camera_vision" -> AppCommand(AppCommand.CAMERA_VISION)
             "open_barcode_scanner" -> AppCommand(AppCommand.SCAN_BARCODE)
+            "send_sos_alert" -> AppCommand(AppCommand.SEND_SOS_ALERT)
             "set_reminder" -> AppCommand(AppCommand.SET_REMINDER, mapOf("title" to args.getString("title"), "delay_minutes" to args.getString("delay_minutes")))
             "get_device_status" -> AppCommand(AppCommand.DEVICE_STATUS)
             "send_to_pc_companion" -> AppCommand(AppCommand.SEND_TO_PC, mapOf("payload" to args.getString("payload")))
