@@ -112,6 +112,26 @@ object ToolRegistry {
             commandType = AppCommand.GET_CURRENT_LOCATION,
         ),
         ToolDefinition(
+            name = "web_search",
+            description = "Search the live public internet for any information the user asks to find. Search in the user's language when possible. Return a concise factual summary with exact source titles and full URLs. Prefer current, reputable sources; mention dates when relevant. Never invent facts or links.",
+            commandType = AppCommand.WEB_SEARCH,
+            parameters = mapOf("query" to ("STRING" to "The complete topic or question to search on the internet")),
+            requiredParams = listOf("query"),
+        ),
+        ToolDefinition(
+            name = "get_weather",
+            description = "Get current conditions and today's forecast from Open-Meteo. Pass the user's city or place name. If location is unknown, ask which city instead of guessing. Include temperature, feels-like, rain chance, wind and source URL.",
+            commandType = AppCommand.GET_WEATHER,
+            parameters = mapOf("location" to ("STRING" to "City or place name for the weather forecast")),
+            requiredParams = listOf("location"),
+        ),
+        ToolDefinition(
+            name = "get_latest_news",
+            description = "Fetch current Hindi Google News RSS headlines for India. Pass an optional topic to focus news; use an empty topic for general headlines. Give headline, publication time if available, and exact source link. Do not present old headlines as breaking news.",
+            commandType = AppCommand.GET_LATEST_NEWS,
+            parameters = mapOf("topic" to ("STRING" to "Optional news topic or category; use an empty string for general India headlines")),
+        ),
+        ToolDefinition(
             name = "save_parking_spot",
             description = "Save the user's current GPS location as their parked vehicle spot.",
             commandType = AppCommand.SAVE_PARKING,
@@ -244,6 +264,10 @@ object ToolRegistry {
             "adjust_volume" -> AppCommand(if (args.getString("direction").lowercase() == "down") AppCommand.VOLUME_DOWN else AppCommand.VOLUME_UP)
             "open_connectivity_settings" -> AppCommand(if (args.getString("type").lowercase() == "bluetooth") AppCommand.BLUETOOTH_SETTINGS else AppCommand.WIFI_SETTINGS)
             "navigate_maps" -> AppCommand(AppCommand.NAVIGATE_MAPS, mapOf("destination" to args.getString("destination")))
+            "get_current_location" -> AppCommand(AppCommand.GET_CURRENT_LOCATION)
+            "web_search" -> AppCommand(AppCommand.WEB_SEARCH, mapOf("query" to args.getString("query")))
+            "get_weather" -> AppCommand(AppCommand.GET_WEATHER, mapOf("location" to args.getString("location")))
+            "get_latest_news" -> AppCommand(AppCommand.GET_LATEST_NEWS, mapOf("topic" to args.optString("topic")))
             "save_parking_spot" -> AppCommand(AppCommand.SAVE_PARKING, mapOf("note" to args.optString("note")))
             "find_parking_spot" -> AppCommand(AppCommand.FIND_PARKING)
             "open_camera_vision" -> AppCommand(AppCommand.CAMERA_VISION)
