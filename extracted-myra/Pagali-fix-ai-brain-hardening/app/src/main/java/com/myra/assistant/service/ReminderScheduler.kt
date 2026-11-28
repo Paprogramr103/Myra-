@@ -8,7 +8,6 @@ import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import com.myra.assistant.R
 import com.myra.assistant.ui.main.MainActivity
 import org.json.JSONArray
 import org.json.JSONObject
