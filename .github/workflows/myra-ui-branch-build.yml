@@ -31,11 +31,6 @@ jobs:
           cache: gradle
           cache-dependency-path: extracted-myra/Pagali-fix-ai-brain-hardening/**/*.gradle*
 
-      - name: Set up Python for wake-word keyword generation
-        uses: actions/setup-python@v6
-        with:
-          python-version: '3.12'
-
       - name: Install Android SDK
         shell: bash
         run: |
@@ -46,28 +41,21 @@ jobs:
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" --install "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Download and prepare offline Hey MYRA wake-word model
+      - name: Download and prepare offline Hindi wake-word model
         working-directory: extracted-myra/Pagali-fix-ai-brain-hardening
         shell: bash
         run: |
           set -euo pipefail
-          MODEL_NAME="sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01"
-          MODEL_URL="https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/${MODEL_NAME}.tar.bz2"
+          MODEL_NAME="vosk-model-small-hi-0.22"
+          MODEL_URL="https://alphacephei.com/vosk/models/${MODEL_NAME}.zip"
           mkdir -p app/src/main/assets
-          curl --fail --location --retry 4 --retry-all-errors "${MODEL_URL}" --output /tmp/myra-kws-model.tar.bz2
-          tar -xjf /tmp/myra-kws-model.tar.bz2 -C app/src/main/assets
-          python -m pip install --disable-pip-version-check "sherpa-onnx==1.13.5" "sentencepiece" "click" "pypinyin"
-          printf 'HEY MYRA\nHI MYRA\nHELLO MYRA\nOKAY MYRA\nSUNO MYRA\nSUNO MAYRA\nHEY MAYRA\nHE MAYRA\n' > "app/src/main/assets/${MODEL_NAME}/keywords_raw.txt"
-          sherpa-onnx-cli text2token \
-            --tokens "app/src/main/assets/${MODEL_NAME}/tokens.txt" \
-            --tokens-type bpe \
-            --bpe-model "app/src/main/assets/${MODEL_NAME}/bpe.model" \
-            "app/src/main/assets/${MODEL_NAME}/keywords_raw.txt" \
-            "app/src/main/assets/${MODEL_NAME}/keywords.txt"
-          rm -f /tmp/myra-kws-model.tar.bz2
-          rm -f "app/src/main/assets/${MODEL_NAME}/bpe.model" "app/src/main/assets/${MODEL_NAME}/keywords_raw.txt"
-          rm -rf "app/src/main/assets/${MODEL_NAME}/test_wavs"
-          test -s "app/src/main/assets/${MODEL_NAME}/keywords.txt"
+          curl --fail --location --retry 4 --retry-all-errors "${MODEL_URL}" --output /tmp/myra-hindi-vosk.zip
+          unzip -q /tmp/myra-hindi-vosk.zip -d app/src/main/assets
+          test -d "app/src/main/assets/${MODEL_NAME}"
+          printf 'myra-hindi-vosk-0.22-v1\n' > "app/src/main/assets/${MODEL_NAME}/uuid"
+          test -s "app/src/main/assets/${MODEL_NAME}/am/final.mdl"
+          test -s "app/src/main/assets/${MODEL_NAME}/conf/model.conf"
+          rm -f /tmp/myra-hindi-vosk.zip
 
       - name: Prepare debug signing
         working-directory: extracted-myra/Pagali-fix-ai-brain-hardening
