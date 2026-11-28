@@ -102,6 +102,7 @@ class AndroidToolsExecutor(
                 message = "Opening Camera & Barcode Scanner.",
                 navigateRoute = "scanner",
             )
+            AppCommand.SEND_SOS_ALERT -> sendSosAlert()
             AppCommand.SET_REMINDER -> {
                 val title = command.params["title"].orEmpty()
                 val minutes = command.params["delay_minutes"]?.toIntOrNull() ?: 0
@@ -376,6 +377,28 @@ class AndroidToolsExecutor(
                 ToolExecutionResult(false, "Unable to initiate call: ${it.message}")
             }
         }
+    }
+
+    private suspend fun sendSosAlert(): ToolExecutionResult {
+        val contact = settingsRepo.getPrimeContacts().firstOrNull()
+            ?: return ToolExecutionResult(
+                false,
+                "SOS सेट करने के लिए पहले MYRA Settings में Prime Contacts के अंदर किसी भरोसेमंद व्यक्ति का नंबर जोड़ें।",
+            )
+        val location = runCatching { getBestCurrentLocation() }.getOrNull()
+        val locationText = if (location != null) {
+            "\nमेरी वर्तमान लोकेशन: https://maps.google.com/?q=${location.latitude},${location.longitude}"
+        } else {
+            "\nमेरी वर्तमान लोकेशन अभी उपलब्ध नहीं है।"
+        }
+        val message = "SOS! मुझे तुरंत मदद चाहिए। कृपया मुझसे संपर्क करें।$locationText"
+        val draft = launchSmsDraft(contact.name, contact.number, message)
+        return if (draft.success) {
+            ToolExecutionResult(
+                true,
+                "SOS संदेश ${contact.name} के लिए SMS ऐप में तैयार है। लोकेशन ${if (location != null) "जोड़ी गई है" else "नहीं मिल सकी"}। कृपया संदेश देखकर Send दबाएँ; MYRA ने अभी SMS नहीं भेजा है।",
+            )
+        } else draft
     }
 
     private suspend fun draftSms(target: String, message: String): ToolExecutionResult {
