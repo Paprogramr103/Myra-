@@ -105,8 +105,8 @@ class WakeWordService : Service() {
             return
         }
         shouldListen.set(true)
-        _statusNote.value = "Loading offline HEY MYRA model..."
-        updateNotification("Loading offline wake-word model...")
+        _statusNote.value = "Loading offline Hindi MYRA model..."
+        updateNotification("Loading offline Hindi wake-word model...")
         workerThread = thread(name = "MYRA-Offline-WakeWord", isDaemon = true) {
             runKeywordSpotter()
         }
