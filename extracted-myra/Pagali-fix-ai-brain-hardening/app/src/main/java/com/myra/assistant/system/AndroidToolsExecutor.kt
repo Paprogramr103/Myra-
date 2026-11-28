@@ -13,6 +13,7 @@ import android.location.Geocoder
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Build
+import android.os.SystemClock
 import android.provider.ContactsContract
 import android.provider.Settings
 import android.telecom.TelecomManager
@@ -385,7 +386,11 @@ class AndroidToolsExecutor(
                 false,
                 "SOS सेट करने के लिए पहले MYRA Settings में Prime Contacts के अंदर किसी भरोसेमंद व्यक्ति का नंबर जोड़ें।",
             )
-        val location = runCatching { getBestCurrentLocation() }.getOrNull()
+        val candidateLocation = runCatching { getBestCurrentLocation() }.getOrNull()
+        val location = candidateLocation?.takeIf {
+            val ageNanos = SystemClock.elapsedRealtimeNanos() - it.elapsedRealtimeNanos
+            ageNanos in 0..(5L * 60L * 1_000_000_000L) && (!it.hasAccuracy() || it.accuracy <= 1_000f)
+        }
         val locationText = if (location != null) {
             "\nमेरी वर्तमान लोकेशन: https://maps.google.com/?q=${location.latitude},${location.longitude}"
         } else {
