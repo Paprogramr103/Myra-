@@ -709,7 +709,7 @@ private fun ChatHistoryList(
                         ),
                 ) {
                     val context = LocalContext.current
-                    val linkPattern = remember { Regex("""https?://[^\\s<>"']+""", RegexOption.IGNORE_CASE) }
+                    val linkPattern = remember { Regex("""https?://[^\\s<>\"']+""", RegexOption.IGNORE_CASE) }
                     val annotatedMessage = remember(msg.text) {
                         buildAnnotatedString {
                             var cursor = 0
